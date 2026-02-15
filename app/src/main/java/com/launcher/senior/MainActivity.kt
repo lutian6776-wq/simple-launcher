@@ -29,6 +29,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.Dp
@@ -44,7 +45,9 @@ import com.launcher.senior.data.AppInfo
 import com.launcher.senior.ui.AppIcon
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import com.launcher.senior.util.SystemInfoHelper
+import com.launcher.senior.util.ScaleHelper
 import com.launcher.senior.viewmodel.MainViewModel
+import com.launcher.senior.viewmodel.MainUiState
 import com.launcher.senior.EmergencyCallActivity
 
 class MainActivity : ComponentActivity() {
@@ -122,45 +125,68 @@ fun MainScreen(
             )
         }
     ) { paddingValues ->
-        val config = LocalConfiguration.current
-        // 以 360dp 宽度为基准，按屏幕宽度缩放（限制在 0.85~1.6 之间）
-        val scale = (config.screenWidthDp / 360f).coerceIn(0.85f, 1.6f)
-        val topButtonHeight = (100 * scale).toInt().coerceAtLeast(72).dp
+        // 使用统一的缩放系统，同时考虑屏幕尺寸和系统字体
+        val scale = ScaleHelper.getScale()
+        val topButtonHeight = ScaleHelper.scaledDp(160, scale).coerceAtLeast(60.dp)
 
-        Column(
+        // 统一使用竖屏布局，横屏时内容会自然旋转
+        PortraitLayout(
+            uiState = uiState,
+            scale = scale,
+            topButtonHeight = topButtonHeight,
+            onEmergencyCallClick = {
+                context.startActivity(Intent(context, EmergencyCallActivity::class.java))
+            },
+            onFilesClick = {
+                context.startActivity(Intent(context, FilesActivity::class.java))
+            },
+            onAppClick = { app -> viewModel.onAppClick(context, app) },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        )
+    }
+}
+
+// 竖屏布局
+@Composable
+fun PortraitLayout(
+    uiState: MainUiState,
+    scale: Float,
+    topButtonHeight: Dp,
+    onEmergencyCallClick: () -> Unit,
+    onFilesClick: () -> Unit,
+    onAppClick: (AppInfo) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 CallButton(
                     phoneNumber = uiState.emergencyPhoneNumber,
-                    onClick = {
-                        context.startActivity(Intent(context, EmergencyCallActivity::class.java))
-                    },
+                    onClick = onEmergencyCallClick,
                     modifier = Modifier
                         .weight(1f)
                         .height(topButtonHeight),
                     scale = scale
                 )
                 FilesButton(
-                    onClick = {
-                        context.startActivity(Intent(context, FilesActivity::class.java))
-                    },
+                    onClick = onFilesClick,
                     modifier = Modifier
                         .weight(1f)
                         .height(topButtonHeight),
                     scale = scale
                 )
             }
-            
+
             // 快捷应用网格（3*3分页）- 占满剩余空间
             if (uiState.quickApps.isNotEmpty() || uiState.customApps.isNotEmpty()) {
                 val allApps = uiState.quickApps + uiState.customApps
@@ -169,7 +195,7 @@ fun MainScreen(
                     AppPager(
                         allApps = allApps,
                         itemsPerPage = itemsPerPage,
-                        onAppClick = { app -> viewModel.onAppClick(context, app) },
+                        onAppClick = onAppClick,
                         scale = scale
                     )
                 }
@@ -189,7 +215,146 @@ fun MainScreen(
             }
         }
     }
+
+// 横屏布局
+@Composable
+fun LandscapeLayout(
+    uiState: MainUiState,
+    scale: Float,
+    onEmergencyCallClick: () -> Unit,
+    onFilesClick: () -> Unit,
+    onAppClick: (AppInfo) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // 左侧：电话和文件按钮（垂直排列）
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.25f),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            CallButton(
+                phoneNumber = uiState.emergencyPhoneNumber,
+                onClick = onEmergencyCallClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                scale = scale
+            )
+            FilesButton(
+                onClick = onFilesClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                scale = scale
+            )
+        }
+
+        // 右侧：应用网格（横向排列，每页更多应用）
+        if (uiState.quickApps.isNotEmpty() || uiState.customApps.isNotEmpty()) {
+            val allApps = uiState.quickApps + uiState.customApps
+            // 横屏时每页显示更多：4行x4列=16个
+            val itemsPerPage = 16
+            Box(
+                modifier = Modifier
+                    .weight(0.75f)
+                    .fillMaxHeight()
+            ) {
+                AppPagerLandscape(
+                    allApps = allApps,
+                    itemsPerPage = itemsPerPage,
+                    onAppClick = onAppClick,
+                    scale = scale
+                )
+            }
+        } else {
+            // 空状态提示
+            Box(
+                modifier = Modifier
+                    .weight(0.75f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "请在设置中添加应用",
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
+
+// 横屏应用分页器
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun AppPagerLandscape(
+    allApps: List<AppInfo>,
+    itemsPerPage: Int = 16,
+    onAppClick: (AppInfo) -> Unit,
+    scale: Float = 1f
+) {
+    val totalPages = remember(allApps.size, itemsPerPage) {
+        if (allApps.isEmpty()) 1 else ceil(allApps.size.toDouble() / itemsPerPage).toInt()
+    }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { totalPages })
+
+    val gridPaddingH = ScaleHelper.scaledDp(4, scale)
+    val gridPaddingV = ScaleHelper.scaledDp(8, scale)
+    val gridSpacing = ScaleHelper.scaledDp(10, scale)
+    val indicatorPaddingV = ScaleHelper.scaledDp(8, scale)
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            key = { it }
+        ) { page ->
+            val startIndex = page * itemsPerPage
+            val pageApps = remember(page, allApps, itemsPerPage) {
+                if (startIndex < allApps.size) {
+                    allApps.subList(startIndex, minOf(startIndex + itemsPerPage, allApps.size))
+                } else {
+                    emptyList()
+                }
+            }
+            // 横屏：4行x4列
+            FixedGridPageLandscape(
+                pageApps = pageApps,
+                onAppClick = onAppClick,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = gridPaddingH, vertical = gridPaddingV),
+                gridSpacing = gridSpacing,
+                scale = scale
+            )
+        }
+
+        if (totalPages > 1) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = indicatorPaddingV),
+                contentAlignment = Alignment.Center
+            ) {
+                PagerIndicator(
+                    count = totalPages,
+                    currentPage = pagerState.currentPage,
+                    scale = scale
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 fun CallButton(
@@ -198,12 +363,14 @@ fun CallButton(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
-    val iconSize = (48 * scale).toInt().coerceIn(28, 72).dp
-    val titleSp = (32 * scale).toInt().coerceIn(18, 48).sp
-    val subtitleSp = (24 * scale).toInt().coerceIn(14, 36).sp
-    val hintSp = (18 * scale).toInt().coerceIn(12, 28).sp
-    val innerSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
-    val cornerDp = (20 * scale).toInt().coerceIn(12, 32).dp
+    val iconSize = ScaleHelper.scaledDp(48, scale)
+    val titleSp = ScaleHelper.scaledSp(24, scale)
+    val innerSpacing = ScaleHelper.scaledDp(8, scale)
+    val cornerDp = ScaleHelper.scaledDp(20, scale)
+
+    // 检测屏幕方向
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Button(
         onClick = onClick,
@@ -217,7 +384,11 @@ fun CallButton(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(innerSpacing)
+            verticalArrangement = Arrangement.spacedBy(innerSpacing),
+            modifier = Modifier.graphicsLayer {
+                // 横屏时旋转90度
+                rotationZ = if (isLandscape) 90f else 0f
+            }
         ) {
             Icon(
                 Icons.Default.Phone,
@@ -231,20 +402,6 @@ fun CallButton(
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
-            if (phoneNumber.isNotEmpty()) {
-                Text(
-                    text = phoneNumber,
-                    fontSize = subtitleSp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White
-                )
-            } else {
-                Text(
-                    text = "请在设置中配置电话号码",
-                    fontSize = hintSp,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-            }
         }
     }
 }
@@ -255,10 +412,14 @@ fun FilesButton(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
-    val iconSize = (48 * scale).toInt().coerceIn(28, 72).dp
-    val titleSp = (32 * scale).toInt().coerceIn(18, 48).sp
-    val innerSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
-    val cornerDp = (20 * scale).toInt().coerceIn(12, 32).dp
+    val iconSize = ScaleHelper.scaledDp(48, scale)
+    val titleSp = ScaleHelper.scaledSp(24, scale)
+    val innerSpacing = ScaleHelper.scaledDp(1, scale)
+    val cornerDp = ScaleHelper.scaledDp(20, scale)
+
+    // 检测屏幕方向
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Button(
         onClick = onClick,
@@ -272,7 +433,11 @@ fun FilesButton(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(innerSpacing)
+            verticalArrangement = Arrangement.spacedBy(innerSpacing),
+            modifier = Modifier.graphicsLayer {
+                // 横屏时旋转90度
+                rotationZ = if (isLandscape) 90f else 0f
+            }
         ) {
             Icon(
                 Icons.Default.Folder,
@@ -303,10 +468,10 @@ fun AppPager(
     }
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { totalPages })
 
-    val gridPaddingH = (4 * scale).toInt().coerceIn(2, 8).dp
-    val gridPaddingV = (8 * scale).toInt().coerceIn(4, 14).dp
-    val gridSpacing = (10 * scale).toInt().coerceIn(6, 16).dp
-    val indicatorPaddingV = (8 * scale).toInt().coerceIn(4, 14).dp
+    val gridPaddingH = ScaleHelper.scaledDp(4, scale)
+    val gridPaddingV = ScaleHelper.scaledDp(8, scale)
+    val gridSpacing = ScaleHelper.scaledDp(10, scale)
+    val indicatorPaddingV = ScaleHelper.scaledDp(8, scale)
 
     Column(modifier = Modifier.fillMaxSize()) {
         HorizontalPager(
@@ -364,8 +529,8 @@ fun PagerIndicator(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
-    val dotSize = (10 * scale).toInt().coerceIn(6, 16).dp
-    val dotSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
+    val dotSize = ScaleHelper.scaledDp(10, scale)
+    val dotSpacing = ScaleHelper.scaledDp(8, scale)
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(dotSpacing)) {
         repeat(count) { index ->
             Box(
@@ -422,6 +587,47 @@ private fun FixedGridPage(
     }
 }
 
+/** 固定 4x4 网格，横屏专用 */
+@Composable
+private fun FixedGridPageLandscape(
+    pageApps: List<AppInfo>,
+    onAppClick: (AppInfo) -> Unit,
+    modifier: Modifier = Modifier,
+    gridSpacing: Dp = 10.dp,
+    scale: Float = 1f
+) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(gridSpacing)
+    ) {
+        repeat(4) { rowIndex ->
+            Row(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(gridSpacing)
+            ) {
+                repeat(4) { colIndex ->
+                    val index = rowIndex * 4 + colIndex
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                    ) {
+                        if (index < pageApps.size) {
+                            val app = pageApps[index]
+                            QuickAppButton(
+                                app = app,
+                                onClick = { onAppClick(app) },
+                                modifier = Modifier.fillMaxSize(),
+                                scale = scale
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickAppButton(
@@ -430,11 +636,15 @@ fun QuickAppButton(
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
-    val titleSp = (15 * scale).toInt().coerceIn(12, 22).sp
-    val lineHeightSp = (18 * scale).toInt().coerceIn(14, 26).sp
-    val innerPadding = (4 * scale).toInt().coerceIn(2, 8).dp
-    val cornerDp = (12 * scale).toInt().coerceIn(8, 20).dp
-    val elevationDp = (4 * scale).toInt().coerceIn(2, 8).dp
+    val titleSp = ScaleHelper.scaledSp(15, scale)
+    val lineHeightSp = ScaleHelper.scaledSp(18, scale)
+    val innerPadding = ScaleHelper.scaledDp(4, scale)
+    val cornerDp = ScaleHelper.scaledDp(12, scale)
+    val elevationDp = ScaleHelper.scaledDp(4, scale)
+
+    // 检测屏幕方向
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     Card(
         onClick = onClick,
@@ -457,7 +667,12 @@ fun QuickAppButton(
             // 图标占按钮边长的大约 70%，防止溢出
             val iconSize = (cellSize * 0.7f).coerceAtMost(cellSize)
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // 横屏时旋转90度
+                        rotationZ = if (isLandscape) 90f else 0f
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -468,7 +683,7 @@ fun QuickAppButton(
                     modifier = Modifier,
                     size = iconSize
                 )
-                Spacer(modifier = Modifier.height((4 * scale).toInt().coerceIn(2, 8).dp))
+                Spacer(modifier = Modifier.height(ScaleHelper.scaledDp(4, scale)))
                 Text(
                     text = app.name,
                     fontSize = titleSp,

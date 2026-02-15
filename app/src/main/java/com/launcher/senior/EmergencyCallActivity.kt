@@ -1,6 +1,7 @@
 package com.launcher.senior
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -44,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.launcher.senior.data.EmergencyContact
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
+import com.launcher.senior.util.ScaleHelper
 import com.launcher.senior.viewmodel.EmergencyCallViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -91,18 +93,23 @@ fun EmergencyCallScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
-    
+    val scale = ScaleHelper.getScale()
+
     LaunchedEffect(Unit) {
         viewModel.loadContacts(context)
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("紧急呼叫", fontSize = 24.sp) },
+                title = { Text("紧急呼叫", fontSize = ScaleHelper.scaledSp(24, scale)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            "返回",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
             )
@@ -113,27 +120,27 @@ fun EmergencyCallScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(32.dp),
+                    .padding(ScaleHelper.scaledDp(32, scale)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
                 ) {
                     Icon(
                         Icons.Default.Phone,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
+                        modifier = Modifier.size(ScaleHelper.scaledDp(64, scale)),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "还没有添加紧急联系人",
-                        fontSize = 20.sp,
+                        fontSize = ScaleHelper.scaledSp(20, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "请在设置中添加紧急联系人",
-                        fontSize = 16.sp,
+                        fontSize = ScaleHelper.scaledSp(16, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -143,15 +150,16 @@ fun EmergencyCallScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(ScaleHelper.scaledDp(8, scale)),
+                verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(8, scale))
             ) {
                 items(uiState.contacts) { contact ->
                     ContactCallItem(
                         contact = contact,
-                        onCall = { phoneNumber ->
+                        scale = scale,
+                        onCall = {
                             scope.launch {
-                                viewModel.initiateCall(context, phoneNumber)
+                                viewModel.initiateCall(contact)
                             }
                         }
                     )
@@ -161,12 +169,12 @@ fun EmergencyCallScreen(
     }
     
     // 显示长按确认对话框
-    uiState.callConfirmation?.let { phoneNumber ->
+    uiState.callConfirmation?.let { contact ->
         CallConfirmationDialog(
-            phoneNumber = phoneNumber,
+            contact = contact,
             onConfirm = {
                 scope.launch {
-                    viewModel.confirmCall(context, phoneNumber)
+                    viewModel.confirmCall(context, contact)
                 }
             },
             onCancel = {
@@ -180,11 +188,12 @@ fun EmergencyCallScreen(
 @Composable
 fun ContactCallItem(
     contact: EmergencyContact,
-    onCall: (String) -> Unit
+    scale: Float = 1f,
+    onCall: () -> Unit
 ) {
     val context = LocalContext.current
     var contactPhoto by remember { mutableStateOf<Bitmap?>(null) }
-    
+
     LaunchedEffect(contact.contactId, contact.photoUri) {
         contactPhoto = if (contact.contactId != null) {
             loadContactPhoto(context, contact.contactId)
@@ -194,24 +203,24 @@ fun ContactCallItem(
             null
         }
     }
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCall(contact.phoneNumber) },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clickable { onCall() },
+        elevation = CardDefaults.cardElevation(defaultElevation = ScaleHelper.scaledDp(2, scale))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(ScaleHelper.scaledDp(16, scale)),
+            horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 头像
             Box(
                 modifier = Modifier
-                    .size(64.dp)
+                    .size(ScaleHelper.scaledDp(64, scale))
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
@@ -226,34 +235,34 @@ fun ContactCallItem(
                     Icon(
                         Icons.Default.Person,
                         contentDescription = contact.name,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(ScaleHelper.scaledDp(32, scale)),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-            
+
             // 联系人信息
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = contact.name,
-                    fontSize = 20.sp,
+                    fontSize = ScaleHelper.scaledSp(20, scale),
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(ScaleHelper.scaledDp(4, scale)))
                 Text(
                     text = contact.phoneNumber,
-                    fontSize = 18.sp,
+                    fontSize = ScaleHelper.scaledSp(18, scale),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             // 拨打电话图标
             Icon(
                 Icons.Default.Phone,
                 contentDescription = "拨打",
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(ScaleHelper.scaledDp(32, scale)),
                 tint = MaterialTheme.colorScheme.primary
             )
         }
@@ -262,20 +271,34 @@ fun ContactCallItem(
 
 @Composable
 fun CallConfirmationDialog(
-    phoneNumber: String,
+    contact: EmergencyContact,
     onConfirm: () -> Unit,
     onCancel: () -> Unit
 ) {
     var progress by remember { mutableStateOf(0f) }
     var isPressed by remember { mutableStateOf(false) }
-    
+    val scale = ScaleHelper.getScale()
+    val context = LocalContext.current
+    var contactPhoto by remember { mutableStateOf<Bitmap?>(null) }
+
+    // 加载联系人头像
+    LaunchedEffect(contact.contactId, contact.photoUri) {
+        contactPhoto = if (contact.contactId != null) {
+            loadContactPhoto(context, contact.contactId)
+        } else if (contact.photoUri != null) {
+            loadPhotoFromUri(context, contact.photoUri)
+        } else {
+            null
+        }
+    }
+
     // 使用 LaunchedEffect 处理计时逻辑
     // 当 isPressed 变为 true 时开始计时，变为 false 时协程会自动取消
     LaunchedEffect(isPressed) {
         if (isPressed) {
             val duration = 2000L // 2秒
             val startTime = System.currentTimeMillis()
-            
+
             while (progress < 1f) {
                 val elapsedTime = System.currentTimeMillis() - startTime
                 progress = (elapsedTime.toFloat() / duration).coerceAtMost(1f)
@@ -294,24 +317,51 @@ fun CallConfirmationDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(ScaleHelper.scaledDp(16, scale)),
             shape = MaterialTheme.shapes.large
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(ScaleHelper.scaledDp(24, scale)),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
             ) {
-                Text("确认拨打电话", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text(phoneNumber, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
-                Text("长按红色按钮拨出", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("确认拨打电话", fontSize = ScaleHelper.scaledSp(24, scale), fontWeight = FontWeight.Bold)
 
-                // 核心交互区域
+                // 联系人头像
                 Box(
                     modifier = Modifier
-                        .size(150.dp) // 稍微加大一点，方便老年人操作
+                        .size(ScaleHelper.scaledDp(80, scale))
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (contactPhoto != null) {
+                        Image(
+                            bitmap = contactPhoto!!.asImageBitmap(),
+                            contentDescription = contact.name,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = contact.name,
+                            modifier = Modifier.size(ScaleHelper.scaledDp(40, scale)),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Text(contact.name, fontSize = ScaleHelper.scaledSp(22, scale), fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+                Text(contact.phoneNumber, fontSize = ScaleHelper.scaledSp(18, scale), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("长按红色按钮拨出", fontSize = ScaleHelper.scaledSp(16, scale), color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // 核心交互区域
+                val buttonSize = ScaleHelper.scaledDp(150, scale)
+                Box(
+                    modifier = Modifier
+                        .size(buttonSize)
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
@@ -325,16 +375,17 @@ fun CallConfirmationDialog(
                 ) {
                     // 绘制进度条背景和进度
                     val colorScheme = MaterialTheme.colorScheme
+                    val strokeWidth = ScaleHelper.scaledDp(10, scale)
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val strokeWidth = 10.dp.toPx()
-                        val radius = (size.minDimension - strokeWidth) / 2
+                        val strokeWidthPx = strokeWidth.toPx()
+                        val radius = (size.minDimension - strokeWidthPx) / 2
                         val center = Offset(size.width / 2, size.height / 2)
 
                         // 背景灰色圆环
                         drawCircle(
                             color = colorScheme.surfaceVariant,
                             radius = radius,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidthPx)
                         )
 
                         // 红色进度圆环
@@ -347,20 +398,20 @@ fun CallConfirmationDialog(
                                 topLeft = Offset(center.x - radius, center.y - radius),
                                 size = Size(radius * 2, radius * 2),
                                 style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                    width = strokeWidth,
-                                    cap = androidx.compose.ui.graphics.StrokeCap.Round // 圆角线条
+                                    width = strokeWidthPx,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
                                 )
                             )
                         }
                     }
 
-                    // 内部的圆形“按钮”视觉样式
+                    // 内部的圆形"按钮"视觉样式
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(ScaleHelper.scaledDp(100, scale))
                             .clip(CircleShape)
                             .background(
-                                if (isPressed) colorScheme.error.copy(alpha = 0.8f) 
+                                if (isPressed) colorScheme.error.copy(alpha = 0.8f)
                                 else colorScheme.error
                             ),
                         contentAlignment = Alignment.Center
@@ -368,14 +419,14 @@ fun CallConfirmationDialog(
                         Icon(
                             Icons.Default.Phone,
                             contentDescription = null,
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(ScaleHelper.scaledDp(48, scale)),
                             tint = Color.White
                         )
                     }
                 }
 
                 TextButton(onClick = onCancel) {
-                    Text("取消", fontSize = 18.sp)
+                    Text("取消", fontSize = ScaleHelper.scaledSp(18, scale))
                 }
             }
         }
@@ -383,15 +434,17 @@ fun CallConfirmationDialog(
 }
 fun loadContactPhoto(context: Context, contactId: Long): Bitmap? {
     return try {
-        val uri = ContactsContract.Contacts.getLookupUri(contactId, "")
+        val uri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
         val inputStream: InputStream? = ContactsContract.Contacts.openContactPhotoInputStream(
             context.contentResolver,
-            uri
+            uri,
+            true // 使用高分辨率照片
         )
         inputStream?.use {
             BitmapFactory.decodeStream(it)
         }
     } catch (e: Exception) {
+        e.printStackTrace()
         null
     }
 }
@@ -404,6 +457,7 @@ fun loadPhotoFromUri(context: Context, photoUriString: String): Bitmap? {
             BitmapFactory.decodeStream(it)
         }
     } catch (e: Exception) {
+        e.printStackTrace()
         null
     }
 }

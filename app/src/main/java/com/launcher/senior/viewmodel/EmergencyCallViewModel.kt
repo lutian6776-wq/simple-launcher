@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 data class EmergencyCallUiState(
     val contacts: List<EmergencyContact> = emptyList(),
-    val callConfirmation: String? = null // 待确认的电话号码
+    val callConfirmation: EmergencyContact? = null // 待确认的联系人
 )
 
 class EmergencyCallViewModel : ViewModel() {
@@ -32,14 +32,14 @@ class EmergencyCallViewModel : ViewModel() {
         }
     }
     
-    fun initiateCall(context: Context, phoneNumber: String) {
+    fun initiateCall(contact: EmergencyContact) {
         // 显示确认对话框
-        _uiState.value = _uiState.value.copy(callConfirmation = phoneNumber)
+        _uiState.value = _uiState.value.copy(callConfirmation = contact)
     }
-    
-    fun confirmCall(context: Context, phoneNumber: String) {
+
+    fun confirmCall(context: Context, contact: EmergencyContact) {
         val intent = Intent(Intent.ACTION_CALL).apply {
-            data = Uri.parse("tel:$phoneNumber")
+            data = Uri.parse("tel:${contact.phoneNumber}")
         }
         try {
             context.startActivity(intent)

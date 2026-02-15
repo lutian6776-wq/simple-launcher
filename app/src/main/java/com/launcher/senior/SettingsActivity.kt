@@ -35,6 +35,7 @@ import com.launcher.senior.util.ContactHelper
 import com.launcher.senior.ui.AppIcon
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import com.launcher.senior.util.AppQueryHelper
+import com.launcher.senior.util.ScaleHelper
 import com.launcher.senior.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
@@ -63,6 +64,9 @@ fun SettingsScreen(
     var showAppSelector by remember { mutableStateOf<AppInfo?>(null) }
     var showCustomAppSelector by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf<AppInfo?>(null) }
+
+    // 统一的缩放因子
+    val scale = ScaleHelper.getScale()
     
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
@@ -129,10 +133,14 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置", fontSize = 24.sp) },
+                title = { Text("设置", fontSize = ScaleHelper.scaledSp(24, scale)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            "返回",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
             )
@@ -142,16 +150,16 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(ScaleHelper.scaledDp(16, scale)),
+            verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
         ) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(ScaleHelper.scaledDp(16, scale)),
+                        verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -161,23 +169,28 @@ fun SettingsScreen(
                             Text(
                                 "紧急联系人",
                                 style = MaterialTheme.typography.titleLarge,
-                                fontSize = 22.sp
+                                fontSize = ScaleHelper.scaledSp(22, scale)
                             )
                             IconButton(onClick = { viewModel.showContactSelector() }) {
-                                Icon(Icons.Default.Add, "添加联系人")
+                                Icon(
+                                    Icons.Default.Add,
+                                    "添加联系人",
+                                    modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                                )
                             }
                         }
-                        
+
                         if (uiState.emergencyContacts.isEmpty()) {
                             Text(
                                 "还没有添加紧急联系人，点击右上角按钮添加",
-                                fontSize = 16.sp,
+                                fontSize = ScaleHelper.scaledSp(16, scale),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             uiState.emergencyContacts.forEach { contact ->
                                 EmergencyContactItem(
                                     contact = contact,
+                                    scale = scale,
                                     onDelete = {
                                         scope.launch {
                                             viewModel.removeEmergencyContact(context, contact)
@@ -195,26 +208,27 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier.padding(ScaleHelper.scaledDp(16, scale)),
+                        verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
                     ) {
                         Text(
                             "快捷应用配置",
                             style = MaterialTheme.typography.titleLarge,
-                            fontSize = 22.sp
+                            fontSize = ScaleHelper.scaledSp(22, scale)
                         )
                         Text(
                             "点击应用可以选择系统应用替代",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 16.sp
+                            fontSize = ScaleHelper.scaledSp(16, scale)
                         )
                     }
                 }
             }
-            
+
             items(uiState.quickApps) { app ->
                 AppConfigItem(
                     app = app,
+                    scale = scale,
                     onSelectApp = if (app.isSystemApp) {
                         { showAppSelector = app }
                     } else {
@@ -234,15 +248,15 @@ fun SettingsScreen(
             // 显示可恢复的预设应用
             if (uiState.availableDefaultApps.isNotEmpty()) {
                 item {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                    Divider(modifier = Modifier.padding(vertical = ScaleHelper.scaledDp(8, scale)))
                     Text(
                         "可恢复的预设应用",
                         style = MaterialTheme.typography.titleLarge,
-                        fontSize = 22.sp,
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        fontSize = ScaleHelper.scaledSp(22, scale),
+                        modifier = Modifier.padding(vertical = ScaleHelper.scaledDp(8, scale))
                     )
                 }
-                
+
                 items(uiState.availableDefaultApps) { app ->
                     Card(
                         modifier = Modifier.fillMaxWidth()
@@ -250,33 +264,33 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
+                                .padding(ScaleHelper.scaledDp(16, scale)),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
                             ) {
                                 Icon(
                                     app.icon,
                                     contentDescription = app.name,
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(ScaleHelper.scaledDp(32, scale))
                                 )
                                 Column {
                                     Text(
                                         app.name,
-                                        fontSize = 20.sp,
+                                        fontSize = ScaleHelper.scaledSp(20, scale),
                                         fontWeight = MaterialTheme.typography.titleMedium.fontWeight
                                     )
                                     Text(
                                         "预设应用",
-                                        fontSize = 14.sp,
+                                        fontSize = ScaleHelper.scaledSp(14, scale),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                            
+
                             Button(
                                 onClick = {
                                     scope.launch {
@@ -284,7 +298,7 @@ fun SettingsScreen(
                                     }
                                 }
                             ) {
-                                Text("恢复", fontSize = 18.sp)
+                                Text("恢复", fontSize = ScaleHelper.scaledSp(18, scale))
                             }
                         }
                     }
@@ -292,18 +306,19 @@ fun SettingsScreen(
             }
             
             item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                Divider(modifier = Modifier.padding(vertical = ScaleHelper.scaledDp(8, scale)))
                 Text(
                     "自定义应用",
                     style = MaterialTheme.typography.titleLarge,
-                    fontSize = 22.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    fontSize = ScaleHelper.scaledSp(22, scale),
+                    modifier = Modifier.padding(vertical = ScaleHelper.scaledDp(8, scale))
                 )
             }
-            
+
             items(uiState.customApps) { app ->
                 AppConfigItem(
                     app = app,
+                    scale = scale,
                     onSelectApp = null,
                     onRename = {
                         showRenameDialog = app
@@ -315,7 +330,7 @@ fun SettingsScreen(
                     }
                 )
             }
-            
+
             item {
                 Button(
                     onClick = {
@@ -326,9 +341,13 @@ fun SettingsScreen(
                         containerColor = MaterialTheme.colorScheme.secondary
                     )
                 ) {
-                    Icon(Icons.Default.Add, "添加")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("添加自定义应用", fontSize = 20.sp)
+                    Icon(
+                        Icons.Default.Add,
+                        "添加",
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                    )
+                    Spacer(modifier = Modifier.width(ScaleHelper.scaledDp(8, scale)))
+                    Text("添加自定义应用", fontSize = ScaleHelper.scaledSp(20, scale))
                 }
             }
         }
@@ -338,6 +357,7 @@ fun SettingsScreen(
 @Composable
 fun AppConfigItem(
     app: AppInfo,
+    scale: Float = 1f,
     onSelectApp: (() -> Unit)?,
     onRename: (() -> Unit)? = null,
     onRemove: () -> Unit
@@ -348,14 +368,14 @@ fun AppConfigItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(ScaleHelper.scaledDp(16, scale)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
             ) {
                 // 使用实际应用图标
                 AppIcon(
@@ -363,22 +383,22 @@ fun AppConfigItem(
                     activityName = app.activityName,
                     defaultIcon = app.icon,
                     modifier = Modifier,
-                    size = 32.dp
+                    size = ScaleHelper.scaledDp(32, scale)
                 )
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         app.name,
-                        fontSize = 20.sp,
+                        fontSize = ScaleHelper.scaledSp(20, scale),
                         fontWeight = MaterialTheme.typography.titleMedium.fontWeight,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (app.packageName != null) {
                         Text(
                             app.packageName,
-                            fontSize = 14.sp,
+                            fontSize = ScaleHelper.scaledSp(14, scale),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -387,14 +407,14 @@ fun AppConfigItem(
                     }
                 }
             }
-            
+
             Row(
                 modifier = Modifier.wrapContentWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(4, scale))
             ) {
                 if (onSelectApp != null) {
                     TextButton(onClick = onSelectApp) {
-                        Text("选择", fontSize = 18.sp)
+                        Text("选择", fontSize = ScaleHelper.scaledSp(16, scale))
                     }
                 }
                 if (onRename != null) {
@@ -402,6 +422,7 @@ fun AppConfigItem(
                         Icon(
                             Icons.Default.Edit,
                             contentDescription = "重命名",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -410,6 +431,7 @@ fun AppConfigItem(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除",
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -422,6 +444,7 @@ fun AppConfigItem(
 @Composable
 fun EmergencyContactItem(
     contact: EmergencyContact,
+    scale: Float = 1f,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -439,19 +462,19 @@ fun EmergencyContactItem(
     
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = ScaleHelper.scaledDp(1, scale))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(ScaleHelper.scaledDp(12, scale)),
+            horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 头像
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(ScaleHelper.scaledDp(48, scale))
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
@@ -466,33 +489,36 @@ fun EmergencyContactItem(
                     Icon(
                         Icons.Default.Person,
                         contentDescription = contact.name,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-            
+
             // 联系人信息
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = contact.name,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = ScaleHelper.scaledSp(18, scale),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = contact.phoneNumber,
-                    fontSize = 16.sp,
+                    fontSize = ScaleHelper.scaledSp(16, scale),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             // 删除按钮
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "删除",
+                    modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -509,12 +535,13 @@ fun ContactSelectorDialog(
     val context = LocalContext.current
     var contacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    
+    val scale = ScaleHelper.getScale()
+
     LaunchedEffect(Unit) {
         contacts = ContactHelper.getAllContacts(context)
         isLoading = false
     }
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -529,22 +556,26 @@ fun ContactSelectorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(ScaleHelper.scaledDp(16, scale)),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "选择联系人",
-                        fontSize = 20.sp,
+                        fontSize = ScaleHelper.scaledSp(20, scale),
                         fontWeight = MaterialTheme.typography.titleLarge.fontWeight
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "关闭")
+                        Icon(
+                            Icons.Default.Close,
+                            "关闭",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
-                
+
                 Divider()
-                
+
                 if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -556,22 +587,22 @@ fun ContactSelectorDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(ScaleHelper.scaledDp(32, scale)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
                         ) {
                             Icon(
                                 Icons.Default.Contacts,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(ScaleHelper.scaledDp(48, scale)),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 "没有找到联系人",
-                                fontSize = 16.sp,
+                                fontSize = ScaleHelper.scaledSp(16, scale),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -587,14 +618,14 @@ fun ContactSelectorDialog(
                                     .clickable {
                                         onContactSelected(contact)
                                     }
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    .padding(ScaleHelper.scaledDp(16, scale)),
+                                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // 头像
                                 Box(
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(ScaleHelper.scaledDp(48, scale))
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.primaryContainer),
                                     contentAlignment = Alignment.Center
@@ -602,21 +633,23 @@ fun ContactSelectorDialog(
                                     Icon(
                                         Icons.Default.Person,
                                         contentDescription = contact.name,
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                
+
                                 Column(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(
                                         text = contact.name,
-                                        fontSize = 18.sp
+                                        fontSize = ScaleHelper.scaledSp(18, scale),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = contact.phoneNumber,
-                                        fontSize = 16.sp,
+                                        fontSize = ScaleHelper.scaledSp(16, scale),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }

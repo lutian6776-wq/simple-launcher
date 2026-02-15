@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.launcher.senior.ui.AppIcon
 import com.launcher.senior.util.AppQueryHelper
+import com.launcher.senior.util.ScaleHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,13 +29,14 @@ fun AllAppsSelectorDialog(
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
-    
+    val scale = ScaleHelper.getScale()
+
     // 查询所有启动器应用（即所有已安装的应用）
     val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
         addCategory(Intent.CATEGORY_LAUNCHER)
     }
     val resolveInfos: List<ResolveInfo> = pm.queryIntentActivities(mainIntent, PackageManager.MATCH_ALL)
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -49,27 +51,31 @@ fun AllAppsSelectorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(ScaleHelper.scaledDp(16, scale)),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "选择应用",
                         style = MaterialTheme.typography.titleLarge,
-                        fontSize = 22.sp
+                        fontSize = ScaleHelper.scaledSp(22, scale)
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "关闭")
+                        Icon(
+                            Icons.Default.Close,
+                            "关闭",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
-                
+
                 Divider()
-                
+
                 // 应用列表
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    contentPadding = PaddingValues(ScaleHelper.scaledDp(8, scale)),
+                    verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(4, scale))
                 ) {
                     // 去重：同一个包名只显示一次
                     val uniqueApps = resolveInfos
@@ -95,9 +101,9 @@ fun AllAppsSelectorDialog(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(ScaleHelper.scaledDp(16, scale)),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
                             ) {
                                 // 应用实际图标
                                 AppIcon(
@@ -105,19 +111,19 @@ fun AllAppsSelectorDialog(
                                     activityName = activityName,
                                     defaultIcon = Icons.Default.Apps,
                                     modifier = Modifier,
-                                    size = 40.dp
+                                    size = ScaleHelper.scaledDp(40, scale)
                                 )
                                 Column(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(
                                         appName,
-                                        fontSize = 18.sp,
+                                        fontSize = ScaleHelper.scaledSp(18, scale),
                                         fontWeight = MaterialTheme.typography.titleMedium.fontWeight
                                     )
                                     Text(
                                         packageName,
-                                        fontSize = 14.sp,
+                                        fontSize = ScaleHelper.scaledSp(14, scale),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -139,13 +145,15 @@ fun SmartAppSelectorDialog(
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
-    
+    val scale = ScaleHelper.getScale()
+
     // 使用智能查询方式
     val resolveInfos: List<ResolveInfo> = AppQueryHelper.queryAppsByType(pm, appType)
-    
+
     AppSelectorDialogContent(
         resolveInfos = resolveInfos,
         pm = pm,
+        scale = scale,
         onAppSelected = onAppSelected,
         onDismiss = onDismiss
     )
@@ -160,13 +168,15 @@ fun AppSelectorDialog(
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
-    
+    val scale = ScaleHelper.getScale()
+
     // 查询能处理该 Intent 的应用
     val resolveInfos: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
-    
+
     AppSelectorDialogContent(
         resolveInfos = resolveInfos,
         pm = pm,
+        scale = scale,
         onAppSelected = onAppSelected,
         onDismiss = onDismiss
     )
@@ -177,10 +187,11 @@ fun AppSelectorDialog(
 private fun AppSelectorDialogContent(
     resolveInfos: List<ResolveInfo>,
     pm: PackageManager,
+    scale: Float = 1f,
     onAppSelected: (String, String, String?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -195,44 +206,48 @@ private fun AppSelectorDialogContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(ScaleHelper.scaledDp(16, scale)),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "选择应用",
                         style = MaterialTheme.typography.titleLarge,
-                        fontSize = 22.sp
+                        fontSize = ScaleHelper.scaledSp(22, scale)
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "关闭")
+                        Icon(
+                            Icons.Default.Close,
+                            "关闭",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
-                
+
                 Divider()
-                
+
                 // 应用列表
                 if (resolveInfos.isEmpty()) {
                     // 空状态提示
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(ScaleHelper.scaledDp(32, scale)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(8, scale))
                         ) {
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(ScaleHelper.scaledDp(48, scale)),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 "未找到相关应用",
-                                fontSize = 18.sp,
+                                fontSize = ScaleHelper.scaledSp(18, scale),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -240,8 +255,8 @@ private fun AppSelectorDialogContent(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        contentPadding = PaddingValues(ScaleHelper.scaledDp(8, scale)),
+                        verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(4, scale))
                     ) {
                         // 去重：同一个包名只显示一次
                         val uniqueApps = resolveInfos
@@ -267,9 +282,9 @@ private fun AppSelectorDialogContent(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
+                                        .padding(ScaleHelper.scaledDp(16, scale)),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
                                 ) {
                                     // 应用实际图标
                                     AppIcon(
@@ -277,19 +292,19 @@ private fun AppSelectorDialogContent(
                                         activityName = activityName,
                                         defaultIcon = Icons.Default.Apps,
                                         modifier = Modifier,
-                                        size = 40.dp
+                                        size = ScaleHelper.scaledDp(40, scale)
                                     )
                                     Column(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text(
                                             appName,
-                                            fontSize = 18.sp,
+                                            fontSize = ScaleHelper.scaledSp(18, scale),
                                             fontWeight = MaterialTheme.typography.titleMedium.fontWeight
                                         )
                                         Text(
                                             packageName,
-                                            fontSize = 14.sp,
+                                            fontSize = ScaleHelper.scaledSp(14, scale),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }

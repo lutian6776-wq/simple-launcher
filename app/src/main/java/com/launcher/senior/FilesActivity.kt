@@ -31,6 +31,7 @@ import com.launcher.senior.data.FileShortcut
 import com.launcher.senior.ui.AppIcon
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import com.launcher.senior.util.FileUtils
+import com.launcher.senior.util.ScaleHelper
 import com.launcher.senior.viewmodel.FilesViewModel
 import kotlinx.coroutines.launch
 
@@ -56,7 +57,8 @@ fun FilesScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
-    
+    val scale = ScaleHelper.getScale()
+
     // 文件选择器 - 使用OpenDocument以获取持久化权限
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -76,25 +78,33 @@ fun FilesScreen(
             }
         }
     }
-    
+
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("文件快捷方式", fontSize = 24.sp) },
+                title = { Text("文件快捷方式", fontSize = ScaleHelper.scaledSp(24, scale)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            "返回",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = {
                         filePickerLauncher.launch(arrayOf("*/*"))
                     }) {
-                        Icon(Icons.Default.Add, "添加文件")
+                        Icon(
+                            Icons.Default.Add,
+                            "添加文件",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
             )
@@ -105,7 +115,11 @@ fun FilesScreen(
                     filePickerLauncher.launch(arrayOf("*/*"))
                 }
             ) {
-                Icon(Icons.Default.Add, "添加文件")
+                Icon(
+                    Icons.Default.Add,
+                    "添加文件",
+                    modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                )
             }
         }
     ) { paddingValues ->
@@ -115,27 +129,27 @@ fun FilesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(32.dp),
+                    .padding(ScaleHelper.scaledDp(32, scale)),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
                 ) {
                     Icon(
                         Icons.Default.Folder,
                         contentDescription = null,
-                        modifier = Modifier.size(64.dp),
+                        modifier = Modifier.size(ScaleHelper.scaledDp(64, scale)),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "还没有添加文件快捷方式",
-                        fontSize = 20.sp,
+                        fontSize = ScaleHelper.scaledSp(20, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         "点击右上角按钮添加文件",
-                        fontSize = 16.sp,
+                        fontSize = ScaleHelper.scaledSp(16, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -145,8 +159,8 @@ fun FilesScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(ScaleHelper.scaledDp(8, scale)),
+                verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(8, scale))
             ) {
                 items(uiState.fileShortcuts) { shortcut ->
                     FileShortcutItem(
@@ -217,7 +231,8 @@ fun FileShortcutItem(
 ) {
     val context = LocalContext.current
     var thumbnail by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    
+    val scale = ScaleHelper.getScale()
+
     LaunchedEffect(shortcut.filePath, shortcut.fileUri) {
         thumbnail = when {
             shortcut.isImage() -> {
@@ -248,19 +263,19 @@ fun FileShortcutItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = ScaleHelper.scaledDp(2, scale))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(ScaleHelper.scaledDp(12, scale)),
+            horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 缩略图或图标
             Box(
                 modifier = Modifier
-                    .size(80.dp),
+                    .size(ScaleHelper.scaledDp(80, scale)),
                 contentAlignment = Alignment.Center
             ) {
                 if (thumbnail != null) {
@@ -282,7 +297,7 @@ fun FileShortcutItem(
                     Icon(
                         icon,
                         contentDescription = shortcut.name,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(ScaleHelper.scaledDp(48, scale)),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -294,33 +309,34 @@ fun FileShortcutItem(
             ) {
                 Text(
                     text = shortcut.name,
-                    fontSize = 20.sp,
+                    fontSize = ScaleHelper.scaledSp(20, scale),
                     fontWeight = MaterialTheme.typography.titleMedium.fontWeight,
-                    maxLines = 1
+                    maxLines = 2
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(ScaleHelper.scaledDp(4, scale)))
                 Text(
                     text = shortcut.getDisplayType(),
-                    fontSize = 16.sp,
+                    fontSize = ScaleHelper.scaledSp(16, scale),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (shortcut.fileSize > 0) {
                     Text(
                         text = FileUtils.formatFileSize(shortcut.fileSize),
-                        fontSize = 14.sp,
+                        fontSize = ScaleHelper.scaledSp(14, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            
+
             // 操作按钮
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(4, scale))
             ) {
                 IconButton(onClick = onRename) {
                     Icon(
                         Icons.Default.Edit,
                         contentDescription = "重命名",
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -329,6 +345,7 @@ fun FileShortcutItem(
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = "设置默认打开方式",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -337,6 +354,7 @@ fun FileShortcutItem(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除",
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale)),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -354,13 +372,14 @@ fun DefaultAppSelectorDialog(
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
-    
+    val scale = ScaleHelper.getScale()
+
     // 查询能够打开该文件类型的应用
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setType(shortcut.mimeType)
     }
     val resolveInfos: List<ResolveInfo> = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -375,43 +394,47 @@ fun DefaultAppSelectorDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(ScaleHelper.scaledDp(16, scale)),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "选择默认打开方式",
-                        fontSize = 20.sp,
+                        fontSize = ScaleHelper.scaledSp(20, scale),
                         fontWeight = MaterialTheme.typography.titleLarge.fontWeight
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "关闭")
+                        Icon(
+                            Icons.Default.Close,
+                            "关闭",
+                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                        )
                     }
                 }
-                
+
                 Divider()
-                
+
                 if (resolveInfos.isEmpty()) {
                     // 空状态
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(32.dp),
+                            .padding(ScaleHelper.scaledDp(32, scale)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
                         ) {
                             Icon(
                                 Icons.Default.Info,
                                 contentDescription = null,
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(ScaleHelper.scaledDp(48, scale)),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 "没有找到可以打开此文件类型的应用",
-                                fontSize = 16.sp,
+                                fontSize = ScaleHelper.scaledSp(16, scale),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -425,26 +448,26 @@ fun DefaultAppSelectorDialog(
                             val appName = resolveInfo.loadLabel(pm).toString()
                             val packageName = resolveInfo.activityInfo.packageName
                             val activityName = resolveInfo.activityInfo.name
-                            
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
                                         onAppSelected(packageName, activityName)
                                     }
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    .padding(ScaleHelper.scaledDp(16, scale)),
+                                horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 AppIcon(
                                     packageName = packageName,
                                     activityName = activityName,
                                     defaultIcon = Icons.Default.Android,
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(ScaleHelper.scaledDp(48, scale))
                                 )
                                 Text(
                                     text = appName,
-                                    fontSize = 18.sp,
+                                    fontSize = ScaleHelper.scaledSp(18, scale),
                                     modifier = Modifier.weight(1f)
                                 )
                             }

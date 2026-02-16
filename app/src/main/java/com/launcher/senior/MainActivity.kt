@@ -9,481 +9,414 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import kotlin.math.ceil
-import kotlin.math.min
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryStd
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.SignalCellular4Bar
+import androidx.compose.material.icons.filled.SignalCellularOff
+import androidx.compose.material.icons.filled.SignalWifi4Bar
+import androidx.compose.material.icons.filled.SignalWifiOff
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.content.ContextCompat
-import androidx.compose.foundation.layout.BoxWithConstraints
-import com.launcher.senior.data.AppInfo
-import com.launcher.senior.ui.AppIcon
+import com.launcher.senior.data.EmergencyContact
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import com.launcher.senior.util.SystemInfoHelper
-import com.launcher.senior.viewmodel.MainViewModel
-import com.launcher.senior.EmergencyCallActivity
+import com.launcher.senior.viewmodel.EmergencyCallViewModel
+import com.launcher.senior.viewmodel.FilesViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val viewModel: MainViewModel by viewModels()
-    
+    private val emergencyViewModel: EmergencyCallViewModel by viewModels()
+    private val filesViewModel: FilesViewModel by viewModels()
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            viewModel.onPermissionGranted()
+            emergencyViewModel.loadContacts(this)
         }
     }
-    
+
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        // 从设置页面返回时刷新数据
-        viewModel.loadData(this)
+        emergencyViewModel.loadContacts(this)
+        filesViewModel.initialize(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 检查并请求权限
         checkPermissions()
-        
         setContent {
             SeniorLauncherTheme {
-                MainScreen(viewModel = viewModel, onSettingsClick = {
-                    val intent = Intent(this, SettingsActivity::class.java)
-                    settingsLauncher.launch(intent)
-                })
+                MainScreen(
+                    emergencyViewModel = emergencyViewModel,
+                    filesViewModel = filesViewModel,
+                    onSettingsClick = {
+                        val intent = Intent(this, SettingsActivity::class.java)
+                        settingsLauncher.launch(intent)
+                    }
+                )
             }
         }
     }
-    
+
     private fun checkPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // 检查电话权限
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.CALL_PHONE
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+            val permissions = arrayOf(
+                Manifest.permission.CALL_PHONE,
+                Manifest.permission.READ_CONTACTS
+            )
+            val neededPermissions = permissions.filter {
+                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen(
-    viewModel: MainViewModel,
-    onSettingsClick: () -> Unit
-) {
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
-    
-    LaunchedEffect(Unit) {
-        viewModel.loadData(context)
-        SystemInfoHelper.startMonitoring(context)
-    }
-    
-    DisposableEffect(Unit) {
-        onDispose {
-            SystemInfoHelper.stopMonitoring(context)
-        }
-    }
-    
-    Scaffold(
-        topBar = {
-            CustomTopBar(
-                onLongPressTitle = onSettingsClick
-            )
-        }
-    ) { paddingValues ->
-        val config = LocalConfiguration.current
-        // 以 360dp 宽度为基准，按屏幕宽度缩放（限制在 0.85~1.6 之间）
-        val scale = (config.screenWidthDp / 360f).coerceIn(0.85f, 1.6f)
-        val topButtonHeight = (100 * scale).toInt().coerceAtLeast(72).dp
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                CallButton(
-                    phoneNumber = uiState.emergencyPhoneNumber,
-                    onClick = {
-                        context.startActivity(Intent(context, EmergencyCallActivity::class.java))
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(topButtonHeight),
-                    scale = scale
-                )
-                FilesButton(
-                    onClick = {
-                        context.startActivity(Intent(context, FilesActivity::class.java))
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(topButtonHeight),
-                    scale = scale
-                )
+            if (neededPermissions.isNotEmpty()) {
+                requestPermissionLauncher.launch(neededPermissions.first())
             }
-            
-            // 快捷应用网格（3*3分页）- 占满剩余空间
-            if (uiState.quickApps.isNotEmpty() || uiState.customApps.isNotEmpty()) {
-                val allApps = uiState.quickApps + uiState.customApps
-                val itemsPerPage = 9
-                Column(modifier = Modifier.weight(1f)) {
-                    AppPager(
-                        allApps = allApps,
-                        itemsPerPage = itemsPerPage,
-                        onAppClick = { app -> viewModel.onAppClick(context, app) },
-                        scale = scale
-                    )
-                }
-            } else {
-                // 空状态提示
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "请在设置中添加应用",
-                        fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CallButton(
-    phoneNumber: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    scale: Float = 1f
-) {
-    val iconSize = (48 * scale).toInt().coerceIn(28, 72).dp
-    val titleSp = (32 * scale).toInt().coerceIn(18, 48).sp
-    val subtitleSp = (24 * scale).toInt().coerceIn(14, 36).sp
-    val hintSp = (18 * scale).toInt().coerceIn(12, 28).sp
-    val innerSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
-    val cornerDp = (20 * scale).toInt().coerceIn(12, 32).dp
-
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(cornerDp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(255, 0, 0),
-            contentColor = Color.White
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(innerSpacing)
-        ) {
-            Icon(
-                Icons.Default.Phone,
-                contentDescription = null,
-                modifier = Modifier.size(iconSize),
-                tint = Color.White
-            )
-            Text(
-                text = "电话",
-                fontSize = titleSp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            if (phoneNumber.isNotEmpty()) {
-                Text(
-                    text = phoneNumber,
-                    fontSize = subtitleSp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White
-                )
-            } else {
-                Text(
-                    text = "请在设置中配置电话号码",
-                    fontSize = hintSp,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun FilesButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    scale: Float = 1f
-) {
-    val iconSize = (48 * scale).toInt().coerceIn(28, 72).dp
-    val titleSp = (32 * scale).toInt().coerceIn(18, 48).sp
-    val innerSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
-    val cornerDp = (20 * scale).toInt().coerceIn(12, 32).dp
-
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(cornerDp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(51, 102, 0),
-            contentColor = Color.White
-        ),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(innerSpacing)
-        ) {
-            Icon(
-                Icons.Default.Folder,
-                contentDescription = "文件宝",
-                modifier = Modifier.size(iconSize),
-                tint = Color.White
-            )
-            Text(
-                text = "文件宝",
-                fontSize = titleSp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun AppPager(
-    allApps: List<AppInfo>,
-    itemsPerPage: Int = 9,
-    onAppClick: (AppInfo) -> Unit,
-    scale: Float = 1f
+fun MainScreen(
+    emergencyViewModel: EmergencyCallViewModel,
+    filesViewModel: FilesViewModel,
+    onSettingsClick: () -> Unit
 ) {
-    val totalPages = remember(allApps.size, itemsPerPage) {
-        if (allApps.isEmpty()) 1 else ceil(allApps.size.toDouble() / itemsPerPage).toInt()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    
+    val emergencyUiState by emergencyViewModel.uiState.collectAsState()
+    val filesUiState by filesViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        emergencyViewModel.loadContacts(context)
+        filesViewModel.initialize(context)
+        SystemInfoHelper.startMonitoring(context)
     }
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { totalPages })
 
-    val gridPaddingH = (4 * scale).toInt().coerceIn(2, 8).dp
-    val gridPaddingV = (8 * scale).toInt().coerceIn(4, 14).dp
-    val gridSpacing = (10 * scale).toInt().coerceIn(6, 16).dp
-    val indicatorPaddingV = (8 * scale).toInt().coerceIn(4, 14).dp
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            // 关键 1：只组合当前页，不预加载左右页（类似 Lawnchair 只布局可见页）
-            // Compose Foundation 1.5.x 使用 beyondBoundsPageCount
-            beyondBoundsPageCount = 0,
-            // 关键 2：每页用 key 稳定，减少无效重组
-            key = { it }
-        ) { page ->
-            val startIndex = page * itemsPerPage
-            val pageApps = remember(page, allApps, itemsPerPage) {
-                if (startIndex < allApps.size) {
-                    allApps.subList(startIndex, minOf(startIndex + itemsPerPage, allApps.size))
-                } else {
-                    emptyList()
-                }
-            }
-            // 关键 3：用固定 3x3 网格替代 LazyVerticalGrid，无 Lazy 测量/滑动开销
-            FixedGridPage(
-                pageApps = pageApps,
-                onAppClick = onAppClick,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = gridPaddingH, vertical = gridPaddingV),
-                gridSpacing = gridSpacing,
-                scale = scale
-            )
-        }
-
-        if (totalPages > 1) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = indicatorPaddingV),
-                contentAlignment = Alignment.Center
-            ) {
-                PagerIndicator(
-                    count = totalPages,
-                    currentPage = pagerState.currentPage,
-                    scale = scale
-                )
-            }
+    DisposableEffect(Unit) {
+        onDispose {
+            SystemInfoHelper.stopMonitoring(context)
         }
     }
-}
 
-@Composable
-fun PagerIndicator(
-    count: Int,
-    currentPage: Int,
-    modifier: Modifier = Modifier,
-    scale: Float = 1f
-) {
-    val dotSize = (10 * scale).toInt().coerceIn(6, 16).dp
-    val dotSpacing = (8 * scale).toInt().coerceIn(4, 14).dp
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(dotSpacing)) {
-        repeat(count) { index ->
-            Box(
-                modifier = Modifier
-                    .size(dotSize)
-                    .clip(CircleShape)
-                    .background(
-                        if (currentPage == index) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+
+    // Track long-press progress
+    var longPressProgress by remember { mutableStateOf(0f) }
+    var isLongPressing by remember { mutableStateOf(false) }
+
+
+    Scaffold(
+        topBar = {
+            Box {
+                TabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                ) {
+                    Tab(
+                        selected = pagerState.currentPage == 0,
+                        onClick = {},  // No action, just indicator
+                        text = { Text("一键拨号", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                     )
-            )
-        }
-    }
-}
+                    Tab(
+                        selected = pagerState.currentPage == 1,
+                        onClick = {},  // No action, just indicator
+                        text = { Text("文件宝", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                    )
+                }
 
-/** 固定 3x3 网格，不接 Lazy，适合每页 9 个的固定布局（参考 Lawnchair 单页即一屏内容） */
-@Composable
-private fun FixedGridPage(
-    pageApps: List<AppInfo>,
-    onAppClick: (AppInfo) -> Unit,
-    modifier: Modifier = Modifier,
-    gridSpacing: Dp = 10.dp,
-    scale: Float = 1f
-) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(gridSpacing)
-    ) {
-        repeat(3) { rowIndex ->
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(gridSpacing)
-            ) {
-                repeat(3) { colIndex ->
-                    val index = rowIndex * 3 + colIndex
+                // Transparent overlay for long-press detection
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    android.util.Log.d("MainActivity", "Press started")
+                                    isLongPressing = true
+                                    val pressStartTime = System.currentTimeMillis()
+                                    val longPressDuration = 1500L // 1.5 seconds
+                                    
+                                    // Animate progress
+                                    scope.launch {
+                                        while (isLongPressing && longPressProgress < 1f) {
+                                            val elapsed = System.currentTimeMillis() - pressStartTime
+                                            longPressProgress = (elapsed.toFloat() / longPressDuration).coerceIn(0f, 1f)
+                                            
+                                            if (longPressProgress >= 1f) {
+                                                android.util.Log.d("MainActivity", "Long press completed, triggering settings")
+                                                onSettingsClick()
+                                                break
+                                            }
+                                            kotlinx.coroutines.delay(16) // ~60fps
+                                        }
+                                    }
+                                    
+                                    tryAwaitRelease()
+                                    android.util.Log.d("MainActivity", "Press released, progress: $longPressProgress")
+                                    isLongPressing = false
+                                    longPressProgress = 0f
+                                }
+                            )
+                        }
+                )
+
+                // Progress indicator overlay
+                if (longPressProgress > 0f) {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f * longPressProgress)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (index < pageApps.size) {
-                            val app = pageApps[index]
-                            QuickAppButton(
-                                app = app,
-                                onClick = { onAppClick(app) },
-                                modifier = Modifier.fillMaxSize(),
-                                scale = scale
+                        androidx.compose.foundation.Canvas(
+                            modifier = Modifier.size(80.dp)
+                        ) {
+                            val strokeWidth = 8.dp.toPx()
+                            val radius = (size.minDimension - strokeWidth) / 2
+                            
+                            // Background circle
+                            drawCircle(
+                                color = Color.White.copy(alpha = 0.3f),
+                                radius = radius,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                            )
+                            
+                            // Progress arc
+                            drawArc(
+                                color = Color.White,
+                                startAngle = -90f,
+                                sweepAngle = 360f * longPressProgress,
+                                useCenter = false,
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = strokeWidth,
+                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                )
                             )
                         }
                     }
                 }
             }
         }
+    ) { paddingValues ->
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) { page ->
+            when (page) {
+                0 -> OneTouchDialingTab(
+                    contacts = emergencyUiState.contacts,
+                    onContactClick = { contact ->
+                        emergencyViewModel.initiateCall(contact)
+                    }
+                )
+                1 -> FilesTab(
+                    uiState = filesUiState,
+                    viewModel = filesViewModel
+                )
+            }
+        }
+
+        emergencyUiState.callConfirmation?.let { contact ->
+            CallConfirmationDialog(
+                contact = contact,
+                onConfirm = {
+                    emergencyViewModel.confirmCall(context, contact.phoneNumber)
+                },
+                onCancel = {
+                    emergencyViewModel.cancelCall()
+                }
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun QuickAppButton(
-    app: AppInfo,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    scale: Float = 1f
+fun OneTouchDialingTab(
+    contacts: List<EmergencyContact>,
+    onContactClick: (EmergencyContact) -> Unit
 ) {
-    val titleSp = (15 * scale).toInt().coerceIn(12, 22).sp
-    val lineHeightSp = (18 * scale).toInt().coerceIn(14, 26).sp
-    val innerPadding = (4 * scale).toInt().coerceIn(2, 8).dp
-    val cornerDp = (12 * scale).toInt().coerceIn(8, 20).dp
-    val elevationDp = (4 * scale).toInt().coerceIn(2, 8).dp
-
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .aspectRatio(1f)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(cornerDp),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevationDp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
+    if (contacts.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            val cellSize = if (maxWidth < maxHeight) maxWidth else maxHeight
-            // 图标占按钮边长的大约 70%，防止溢出
-            val iconSize = (cellSize * 0.7f).coerceAtMost(cellSize)
             Column(
-                modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AppIcon(
-                    packageName = app.packageName,
-                    activityName = app.activityName,
-                    defaultIcon = app.icon,
-                    modifier = Modifier,
-                    size = iconSize
+                Icon(
+                    Icons.Default.Phone,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height((4 * scale).toInt().coerceIn(2, 8).dp))
                 Text(
-                    text = app.name,
-                    fontSize = titleSp,
-                    lineHeight = lineHeightSp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    minLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
+                    "还没有添加联系人",
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    "请长按顶部标题进入设置添加",
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(contacts) { contact ->
+                ContactCallItem(contact = contact, onCall = { onContactClick(contact) })
             }
         }
     }
 }
+
+
+
+@Composable
+fun FilesTab(
+    uiState: com.launcher.senior.viewmodel.FilesUiState,
+    viewModel: FilesViewModel
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (uiState.fileShortcuts.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "还没有添加文件快捷方式",
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "请长按顶部标题进入设置添加",
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(uiState.fileShortcuts) { shortcut ->
+                    FileShortcutItem(
+                        shortcut = shortcut,
+                        onClick = { viewModel.openFile(context, shortcut) }
+                    )
+                }
+            }
+            
+        }
+    }
+
+    uiState.showAppSelector?.let { shortcut ->
+        DefaultAppSelectorDialog(
+            shortcut = shortcut,
+            onAppSelected = { packageName, activityName ->
+                scope.launch { viewModel.setDefaultApp(context, shortcut, packageName, activityName) }
+            },
+            onDismiss = { viewModel.dismissAppSelector() }
+        )
+    }
+    
+    uiState.showRenameDialog?.let { shortcut ->
+        RenameDialog(
+            currentName = shortcut.name,
+            onConfirm = { newName ->
+                scope.launch { viewModel.renameFileShortcut(context, shortcut, newName) }
+            },
+            onDismiss = { viewModel.dismissRenameDialog() }
+        )
+    }
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -503,7 +436,6 @@ fun CustomTopBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 左侧占位（与右侧等宽，使标题居中；时间在系统状态栏已有）
             Box(modifier = Modifier.weight(1f))
             Text(
                 text = "老人桌面",
@@ -526,21 +458,16 @@ fun CustomTopBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                // WiFi信号
-                if (systemInfo.isWifiConnected) {
-                    WifiSignalIcon(strength = systemInfo.wifiSignalStrength)
-                }
-                
-                // 移动数据信号
-                if (systemInfo.isMobileDataEnabled) {
-                    MobileSignalIcon(strength = systemInfo.mobileSignalStrength)
-                }
-                
-                // 电量
-                BatteryIcon(
-                    level = systemInfo.batteryLevel,
-                    isCharging = systemInfo.isCharging
-                )
+                    if (systemInfo.isWifiConnected) {
+                        WifiSignalIcon(strength = systemInfo.wifiSignalStrength)
+                    }
+                    if (systemInfo.isMobileDataEnabled) {
+                        MobileSignalIcon(strength = systemInfo.mobileSignalStrength)
+                    }
+                    BatteryIcon(
+                        level = systemInfo.batteryLevel,
+                        isCharging = systemInfo.isCharging
+                    )
                 }
             }
         }
@@ -562,7 +489,6 @@ fun WifiSignalIcon(strength: Int) {
         modifier = Modifier.size(20.dp),
         tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(
             alpha = if (strength > 0) {
-                // 根据信号强度调整透明度：4=1.0, 3=0.75, 2=0.5, 1=0.25
                 when (strength) {
                     4 -> 1.0f
                     3 -> 0.75f
@@ -574,6 +500,7 @@ fun WifiSignalIcon(strength: Int) {
         )
     )
 }
+
 @Composable
 fun MobileSignalIcon(strength: Int) {
     val icon = when {
@@ -589,7 +516,6 @@ fun MobileSignalIcon(strength: Int) {
         modifier = Modifier.size(20.dp),
         tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(
             alpha = if (strength > 0) {
-                // 根据信号强度调整透明度：4=1.0, 3=0.75, 2=0.5, 1=0.25
                 when (strength) {
                     4 -> 1.0f
                     3 -> 0.75f

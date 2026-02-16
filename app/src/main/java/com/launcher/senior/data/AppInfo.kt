@@ -15,6 +15,7 @@ data class AppInfo(
 ) {
     companion object {
         // 预定义的应用
+        @Suppress("DEPRECATION")
         val WECHAT = AppInfo(
             id = "wechat",
             name = "微信",
@@ -55,6 +56,7 @@ data class AppInfo(
             isSystemApp = true
         )
         
+        @Suppress("DEPRECATION")
         val MESSAGE = AppInfo(
             id = "message",
             name = "信息",

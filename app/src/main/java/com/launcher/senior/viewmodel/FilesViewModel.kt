@@ -57,7 +57,7 @@ class FilesViewModel : ViewModel() {
         }
     }
     
-    suspend fun showDefaultAppSelector(context: Context, shortcut: FileShortcut) {
+    suspend fun showDefaultAppSelector(shortcut: FileShortcut) {
         _uiState.value = _uiState.value.copy(showAppSelector = shortcut)
     }
     
@@ -85,7 +85,7 @@ class FilesViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(showAppSelector = null)
     }
     
-    suspend fun showRenameDialog(context: Context, shortcut: FileShortcut) {
+    suspend fun showRenameDialog(shortcut: FileShortcut) {
         _uiState.value = _uiState.value.copy(showRenameDialog = shortcut)
     }
     
@@ -198,16 +198,11 @@ class FilesViewModel : ViewModel() {
             if (shortcut.filePath != null) {
                 val file = File(shortcut.filePath)
                 if (file.exists()) {
-                    val fileUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        // Android 7.0+ 使用 FileProvider
-                        FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            file
-                        )
-                    } else {
-                        Uri.fromFile(file)
-                    }
+                    val fileUri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
                     openFileWithUri(
                         context, 
                         fileUri, 

@@ -1,13 +1,16 @@
 package com.launcher.senior.util
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.telephony.TelephonyManager
+import androidx.core.app.ActivityCompat
 import androidx.compose.runtime.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,6 +88,7 @@ object SystemInfoHelper {
         timeUpdateJob = null
     }
     
+    @Suppress("DEPRECATION")
     private fun updateNetworkInfo(context: Context) {
         try {
             // WiFi信号强度
@@ -109,18 +113,29 @@ object SystemInfoHelper {
                 if (telephonyManager != null) {
                     // 尝试获取信号强度
                     try {
-                        val signalStrength = telephonyManager.signalStrength
-                        if (signalStrength != null) {
-                            mobileLevel = signalStrength.level // 0-4
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            val signalStrength = telephonyManager.signalStrength
+                            if (signalStrength != null) {
+                                mobileLevel = signalStrength.level // 0-4
+                            }
                         }
                     } catch (e: Exception) {
-                        // 如果无法获取信号强度，尝试其他方法
+                        e.printStackTrace()
+                    }
+                    
+                    // 如果无法获取信号强度，尝试其他方法
+                    if (mobileLevel == 0) {
                         try {
-                            // 使用getCellLocation或其他方法
-                            val cellInfo = telephonyManager.allCellInfo
-                            if (cellInfo != null && cellInfo.isNotEmpty()) {
-                                // 简化处理：如果有信号就显示中等强度
-                                mobileLevel = 2
+                            if (ActivityCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                val cellInfo = telephonyManager.allCellInfo
+                                if (cellInfo != null && cellInfo.isNotEmpty()) {
+                                    // 简化处理：如果有信号就显示中等强度
+                                    mobileLevel = 2
+                                }
                             }
                         } catch (e2: Exception) {
                             // 如果都失败，使用默认值
@@ -129,7 +144,15 @@ object SystemInfoHelper {
                     
                     // 检查移动数据是否启用
                     isMobileDataEnabled = try {
-                        telephonyManager.isDataEnabled
+                         if (ActivityCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.READ_PHONE_STATE
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                             telephonyManager.isDataEnabled
+                         } else {
+                             false
+                         }
                     } catch (e: Exception) {
                         false
                     }

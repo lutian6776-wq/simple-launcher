@@ -169,7 +169,7 @@ object FileUtils {
     fun getFilePathFromUri(context: Context, uri: Uri): String? {
         var result: String? = null
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT && DocumentsContract.isDocumentUri(context, uri)) {
+        if (DocumentsContract.isDocumentUri(context, uri)) {
             val docId = DocumentsContract.getDocumentId(uri)
             
             when {

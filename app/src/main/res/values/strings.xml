@@ -1,29 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">老人桌面</string>
-    <string name="call">一键呼叫</string>
-    <string name="wechat">微信</string>
-    <string name="douyin">抖音</string>
-    <string name="camera">相机</string>
-    <string name="gallery">图库</string>
-    <string name="weather">天气</string>
     <string name="settings">设置</string>
-    <string name="add_app">添加应用</string>
-    <string name="select_app">选择应用</string>
-    <string name="custom_apps">自定义应用</string>
-    <string name="configure_apps">配置应用</string>
-    <string name="phone_number">电话号码</string>
-    <string name="enter_phone_number">请输入电话号码</string>
-    <string name="save">保存</string>
-    <string name="cancel">取消</string>
-    <string name="delete">删除</string>
-    <string name="app_name_label">应用名称</string>
-    <string name="package_name">包名</string>
-    <string name="permission_required">需要权限</string>
-    <string name="permission_denied">权限被拒绝</string>
     <string name="files">文件快捷方式</string>
-    <string name="file_shortcuts">文件快捷方式</string>
-    <string name="add_file">添加文件</string>
-    <string name="no_files">还没有添加文件快捷方式</string>
-    <string name="click_to_add_file">点击右上角按钮添加文件</string>
 </resources>

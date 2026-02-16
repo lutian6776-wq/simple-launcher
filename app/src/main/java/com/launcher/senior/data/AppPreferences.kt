@@ -158,7 +158,7 @@ class AppPreferences(private val context: Context? = null) {
             
             // 根据ID获取图标
             val icon = when (id) {
-                "wechat" -> Icons.Default.Chat
+                "wechat" -> @Suppress("DEPRECATION") Icons.Default.Chat
                 "douyin" -> Icons.Default.VideoLibrary
                 "camera" -> Icons.Default.CameraAlt
                 "gallery" -> Icons.Default.PhotoLibrary

@@ -2,6 +2,7 @@ package com.launcher.senior
 
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.view.WindowManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,18 +25,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
-import com.launcher.senior.AppSelectorDialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import com.launcher.senior.viewmodel.FilesViewModel
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.launcher.senior.data.AppInfo
 import com.launcher.senior.data.AppPreferences
 import com.launcher.senior.data.EmergencyContact
 import com.launcher.senior.util.ContactHelper
-import com.launcher.senior.ui.AppIcon
-import com.launcher.senior.ui.theme.SeniorLauncherTheme
-import com.launcher.senior.util.AppQueryHelper
 import com.launcher.senior.viewmodel.SettingsViewModel
+import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import kotlinx.coroutines.launch
 
 class SettingsActivity : ComponentActivity() {
@@ -55,45 +56,39 @@ class SettingsActivity : ComponentActivity() {
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    filesViewModel: FilesViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val filesUiState by filesViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
-    var showAppSelector by remember { mutableStateOf<AppInfo?>(null) }
-    var showCustomAppSelector by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf<AppInfo?>(null) }
+    
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            scope.launch {
+                filesViewModel.addFileShortcutFromUri(context, it)
+            }
+        }
+    }
+
     
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
+        filesViewModel.initialize(context)
     }
     
-    // 自定义应用选择对话框（显示所有已安装应用）
-    if (showCustomAppSelector) {
-        AllAppsSelectorDialog(
-            onAppSelected = { packageName, appName, activityName ->
-                scope.launch {
-                    viewModel.addCustomApp(context, packageName, appName, activityName)
-                    showCustomAppSelector = false
-                }
-            },
-            onDismiss = { showCustomAppSelector = false }
-        )
-    }
-    
-    // 系统应用选择对话框
-    showAppSelector?.let { app ->
-        SmartAppSelectorDialog(
-            appType = app.id,
-            onAppSelected = { packageName, appName, activityName ->
-                scope.launch {
-                    viewModel.selectSystemApp(context, app, packageName, appName, activityName)
-                    showAppSelector = null
-                }
-            },
-            onDismiss = { showAppSelector = null }
-        )
-    }
+
     
     // 联系人选择对话框
     if (uiState.showContactSelector) {
@@ -110,21 +105,7 @@ fun SettingsScreen(
         )
     }
     
-    // 应用重命名对话框
-    showRenameDialog?.let { app ->
-        RenameAppDialog(
-            currentName = app.name,
-            onConfirm = { newName ->
-                scope.launch {
-                    viewModel.renameApp(context, app, newName)
-                    showRenameDialog = null
-                }
-            },
-            onDismiss = {
-                showRenameDialog = null
-            }
-        )
-    }
+
     
     Scaffold(
         topBar = {
@@ -132,6 +113,7 @@ fun SettingsScreen(
                 title = { Text("设置", fontSize = 24.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
+                        @Suppress("DEPRECATION")
                         Icon(Icons.Default.ArrowBack, "返回")
                     }
                 }
@@ -198,225 +180,79 @@ fun SettingsScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            "快捷应用配置",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontSize = 22.sp
-                        )
-                        Text(
-                            "点击应用可以选择系统应用替代",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-            }
-            
-            items(uiState.quickApps) { app ->
-                AppConfigItem(
-                    app = app,
-                    onSelectApp = if (app.isSystemApp) {
-                        { showAppSelector = app }
-                    } else {
-                        null
-                    },
-                    onRename = {
-                        showRenameDialog = app
-                    },
-                    onRemove = {
-                        scope.launch {
-                            viewModel.removeQuickApp(context, app)
-                        }
-                    }
-                )
-            }
-            
-            // 显示可恢复的预设应用
-            if (uiState.availableDefaultApps.isNotEmpty()) {
-                item {
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                    Text(
-                        "可恢复的预设应用",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontSize = 22.sp,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                }
-                
-                items(uiState.availableDefaultApps) { app ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    app.icon,
-                                    contentDescription = app.name,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                                Column {
-                                    Text(
-                                        app.name,
-                                        fontSize = 20.sp,
-                                        fontWeight = MaterialTheme.typography.titleMedium.fontWeight
-                                    )
-                                    Text(
-                                        "预设应用",
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        viewModel.restoreDefaultApp(context, app)
-                                    }
-                                }
-                            ) {
-                                Text("恢复", fontSize = 18.sp)
+                            Text(
+                                "文件宝管理",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontSize = 22.sp
+                            )
+                            IconButton(onClick = { filePickerLauncher.launch(arrayOf("*/*")) }) {
+                                Icon(Icons.Default.Add, "添加文件")
                             }
                         }
+                        
+                        if (filesUiState.fileShortcuts.isEmpty()) {
+                            Text(
+                                "还没有添加文件快捷方式",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                    } else {
+                        filesUiState.fileShortcuts.forEach { shortcut ->
+                            FileShortcutItem(
+                                shortcut = shortcut,
+                                onClick = { 
+                                     filesViewModel.openFile(context, shortcut)
+                                },
+                                onRename = { scope.launch { filesViewModel.showRenameDialog(shortcut) } },
+                                onDelete = { scope.launch { filesViewModel.removeFileShortcut(context, shortcut) } },
+                                onSetDefaultApp = { scope.launch { filesViewModel.showDefaultAppSelector(shortcut) } }
+                            )
+                        }
+                    }
                     }
                 }
             }
-            
-            item {
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                Text(
-                    "自定义应用",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 22.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            
-            items(uiState.customApps) { app ->
-                AppConfigItem(
-                    app = app,
-                    onSelectApp = null,
-                    onRename = {
-                        showRenameDialog = app
-                    },
-                    onRemove = {
-                        scope.launch {
-                            viewModel.removeCustomApp(context, app)
-                        }
-                    }
-                )
-            }
-            
-            item {
-                Button(
-                    onClick = {
-                        showCustomAppSelector = true
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    Icon(Icons.Default.Add, "添加")
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("添加自定义应用", fontSize = 20.sp)
-                }
-            }
+
+
         }
+    }
+
+    // 文件宝相关对话框
+    filesUiState.showAppSelector?.let { shortcut ->
+        DefaultAppSelectorDialog(
+            shortcut = shortcut,
+            onAppSelected = { packageName, activityName ->
+                scope.launch {
+                    filesViewModel.setDefaultApp(context, shortcut, packageName, activityName)
+                }
+            },
+            onDismiss = {
+                filesViewModel.dismissAppSelector()
+            }
+        )
+    }
+    
+    filesUiState.showRenameDialog?.let { shortcut ->
+        RenameDialog(
+            currentName = shortcut.name,
+            onConfirm = { newName ->
+                scope.launch {
+                    filesViewModel.renameFileShortcut(context, shortcut, newName)
+                }
+            },
+            onDismiss = {
+                filesViewModel.dismissRenameDialog()
+            }
+        )
     }
 }
 
-@Composable
-fun AppConfigItem(
-    app: AppInfo,
-    onSelectApp: (() -> Unit)?,
-    onRename: (() -> Unit)? = null,
-    onRemove: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // 使用实际应用图标
-                AppIcon(
-                    packageName = app.packageName,
-                    activityName = app.activityName,
-                    defaultIcon = app.icon,
-                    modifier = Modifier,
-                    size = 32.dp
-                )
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        app.name,
-                        fontSize = 20.sp,
-                        fontWeight = MaterialTheme.typography.titleMedium.fontWeight,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (app.packageName != null) {
-                        Text(
-                            app.packageName,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-            
-            Row(
-                modifier = Modifier.wrapContentWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (onSelectApp != null) {
-                    TextButton(onClick = onSelectApp) {
-                        Text("选择", fontSize = 18.sp)
-                    }
-                }
-                if (onRename != null) {
-                    IconButton(onClick = onRename) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "重命名",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-                IconButton(onClick = onRemove) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
-    }
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -481,6 +317,11 @@ fun EmergencyContactItem(
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium
                 )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
                 Text(
                     text = contact.phoneNumber,
                     fontSize = 16.sp,
@@ -543,7 +384,7 @@ fun ContactSelectorDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 if (isLoading) {
                     Box(
@@ -621,7 +462,7 @@ fun ContactSelectorDialog(
                                     )
                                 }
                             }
-                            Divider()
+                            HorizontalDivider()
                         }
                     }
                 }
@@ -630,41 +471,4 @@ fun ContactSelectorDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun RenameAppDialog(
-    currentName: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var textFieldValue by remember { mutableStateOf(currentName) }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("重命名应用") },
-        text = {
-            OutlinedTextField(
-                value = textFieldValue,
-                onValueChange = { textFieldValue = it },
-                label = { Text("应用名称") },
-                singleLine = true
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (textFieldValue.isNotBlank()) {
-                        onConfirm(textFieldValue)
-                    }
-                }
-            ) {
-                Text("确定")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
-}
+

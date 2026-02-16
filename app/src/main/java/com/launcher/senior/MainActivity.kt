@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -219,39 +221,28 @@ fun MainScreen(
                         }
                 )
 
-                // Progress indicator overlay
+
+                // Progress indicator overlay - horizontal bar at top
                 if (longPressProgress > 0f) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.3f * longPressProgress)),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.TopCenter)
                     ) {
-                        androidx.compose.foundation.Canvas(
-                            modifier = Modifier.size(80.dp)
-                        ) {
-                            val strokeWidth = 8.dp.toPx()
-                            val radius = (size.minDimension - strokeWidth) / 2
-                            
-                            // Background circle
-                            drawCircle(
-                                color = Color.White.copy(alpha = 0.3f),
-                                radius = radius,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
-                            )
-                            
-                            // Progress arc
-                            drawArc(
-                                color = Color.White,
-                                startAngle = -90f,
-                                sweepAngle = 360f * longPressProgress,
-                                useCenter = false,
-                                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                    width = strokeWidth,
-                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
-                                )
-                            )
-                        }
+                        // Background bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.White.copy(alpha = 0.2f))
+                        )
+                        // Progress bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(longPressProgress)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+                        )
                     }
                 }
             }

@@ -102,9 +102,10 @@ fun SettingsScreen(
     // 联系人选择对话框
     if (uiState.showContactSelector) {
         ContactSelectorDialog(
-            onContactSelected = { contact ->
+            onContactsSelected = { contacts ->
                 scope.launch {
-                    viewModel.addEmergencyContact(context, contact)
+                    val category = uiState.selectedCategory ?: "other"
+                    viewModel.addEmergencyContacts(context, contacts, category)
                     viewModel.dismissContactSelector()
                 }
             },
@@ -167,11 +168,52 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "紧急联系人",
+                                "家人",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontSize = ScaleHelper.scaledSp(22, scale)
                             )
-                            IconButton(onClick = { viewModel.showContactSelector() }) {
+                            IconButton(onClick = { viewModel.showContactSelector("family") }) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    "添加家人",
+                                    modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                                )
+                            }
+                        }
+
+                        if (uiState.emergencyContacts.none { it.category == "family" }) {
+                            Text(
+                                "还没有添加家人，点击右上角按钮添加",
+                                fontSize = ScaleHelper.scaledSp(16, scale),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            uiState.emergencyContacts.filter { it.category == "family" }.forEach { contact ->
+                                EmergencyContactItem(
+                                    contact = contact,
+                                    scale = scale,
+                                    onDelete = {
+                                        scope.launch {
+                                            viewModel.removeEmergencyContact(context, contact)
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        
+                        Divider(modifier = Modifier.padding(vertical = ScaleHelper.scaledDp(8, scale)))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "其他联系人",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontSize = ScaleHelper.scaledSp(22, scale)
+                            )
+                            IconButton(onClick = { viewModel.showContactSelector("other") }) {
                                 Icon(
                                     Icons.Default.Add,
                                     "添加联系人",
@@ -180,14 +222,14 @@ fun SettingsScreen(
                             }
                         }
 
-                        if (uiState.emergencyContacts.isEmpty()) {
+                        if (uiState.emergencyContacts.none { it.category != "family" }) {
                             Text(
-                                "还没有添加紧急联系人，点击右上角按钮添加",
+                                "还没有添加其他联系人，点击右上角按钮添加",
                                 fontSize = ScaleHelper.scaledSp(16, scale),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
-                            uiState.emergencyContacts.forEach { contact ->
+                            uiState.emergencyContacts.filter { it.category != "family" }.forEach { contact ->
                                 EmergencyContactItem(
                                     contact = contact,
                                     scale = scale,
@@ -529,11 +571,12 @@ fun EmergencyContactItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactSelectorDialog(
-    onContactSelected: (EmergencyContact) -> Unit,
+    onContactsSelected: (List<EmergencyContact>) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var contacts by remember { mutableStateOf<List<EmergencyContact>>(emptyList()) }
+    var selectedContacts by remember { mutableStateOf<Set<EmergencyContact>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     val scale = ScaleHelper.getScale()
 
@@ -578,7 +621,9 @@ fun ContactSelectorDialog(
 
                 if (isLoading) {
                     Box(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
@@ -586,6 +631,7 @@ fun ContactSelectorDialog(
                 } else if (contacts.isEmpty()) {
                     Box(
                         modifier = Modifier
+                            .weight(1f)
                             .fillMaxSize()
                             .padding(ScaleHelper.scaledDp(32, scale)),
                         contentAlignment = Alignment.Center
@@ -609,19 +655,37 @@ fun ContactSelectorDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
                     ) {
                         items(contacts) { contact ->
+                            val isSelected = selectedContacts.contains(contact)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        onContactSelected(contact)
+                                        selectedContacts = if (isSelected) {
+                                            selectedContacts - contact
+                                        } else {
+                                            selectedContacts + contact
+                                        }
                                     }
                                     .padding(ScaleHelper.scaledDp(16, scale)),
                                 horizontalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        selectedContacts = if (checked) {
+                                            selectedContacts + contact
+                                        } else {
+                                            selectedContacts - contact
+                                        }
+                                    }
+                                )
+                                
                                 // 头像
                                 Box(
                                     modifier = Modifier
@@ -655,6 +719,40 @@ fun ContactSelectorDialog(
                                 }
                             }
                             Divider()
+                        }
+                    }
+                    
+                    // 底部操作栏
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(ScaleHelper.scaledDp(16, scale)),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                if (selectedContacts.size == contacts.size) {
+                                    selectedContacts = emptySet()
+                                } else {
+                                    selectedContacts = contacts.toSet()
+                                }
+                            }
+                        ) {
+                            Text(
+                                if (selectedContacts.size == contacts.size) "取消全选" else "全选",
+                                fontSize = ScaleHelper.scaledSp(18, scale)
+                            )
+                        }
+
+                        Button(
+                            onClick = { onContactsSelected(selectedContacts.toList()) },
+                            enabled = selectedContacts.isNotEmpty()
+                        ) {
+                            Text(
+                                if (selectedContacts.isEmpty()) "确定" else "确定 (${selectedContacts.size})",
+                                fontSize = ScaleHelper.scaledSp(18, scale)
+                            )
                         }
                     }
                 }

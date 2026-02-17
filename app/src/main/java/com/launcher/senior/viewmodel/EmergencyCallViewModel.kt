@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 
 data class EmergencyCallUiState(
     val contacts: List<EmergencyContact> = emptyList(),
+    val familyContacts: List<EmergencyContact> = emptyList(),
+    val otherContacts: List<EmergencyContact> = emptyList(),
     val callConfirmation: EmergencyContact? = null // 待确认的联系人
 )
 
@@ -27,8 +29,22 @@ class EmergencyCallViewModel : ViewModel() {
     fun loadContacts(context: Context) {
         viewModelScope.launch {
             val prefs = AppPreferences(context)
-            val contacts = prefs.getEmergencyContacts()
-            _uiState.value = _uiState.value.copy(contacts = contacts)
+            var contacts = prefs.getEmergencyContacts()
+            
+            // 按首字母和排序键排序
+            contacts = contacts.sortedWith(compareBy(
+                { it.initialLetter ?: "#" },
+                { it.sortKey ?: it.name }
+            ))
+            
+            val familyContacts = contacts.filter { it.category == "family" }
+            val otherContacts = contacts.filter { it.category != "family" }
+            
+            _uiState.value = _uiState.value.copy(
+                contacts = contacts,
+                familyContacts = familyContacts,
+                otherContacts = otherContacts
+            )
         }
     }
     

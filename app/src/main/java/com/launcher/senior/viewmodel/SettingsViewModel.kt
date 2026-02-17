@@ -27,7 +27,8 @@ data class SettingsUiState(
     val quickApps: List<AppInfo> = emptyList(),
     val customApps: List<AppInfo> = emptyList(),
     val availableDefaultApps: List<AppInfo> = emptyList(), // 可恢复的预设应用
-    val showContactSelector: Boolean = false // 显示联系人选择器
+    val showContactSelector: Boolean = false, // 显示联系人选择器
+    val selectedCategory: String? = null // 当前选择的联系人类别
 )
 
 class SettingsViewModel : ViewModel() {
@@ -132,14 +133,6 @@ class SettingsViewModel : ViewModel() {
         }
     }
     
-    fun showContactSelector() {
-        _uiState.value = _uiState.value.copy(showContactSelector = true)
-    }
-    
-    fun dismissContactSelector() {
-        _uiState.value = _uiState.value.copy(showContactSelector = false)
-    }
-    
     suspend fun addEmergencyContact(context: Context, contact: EmergencyContact) {
         val prefs = AppPreferences(context)
         val currentContacts = prefs.getEmergencyContacts().toMutableList()
@@ -157,6 +150,34 @@ class SettingsViewModel : ViewModel() {
         currentContacts.removeAll { it.id == contact.id }
         prefs.setEmergencyContacts(currentContacts)
         loadData(context)
+    }
+
+    fun showContactSelector(category: String = "other") {
+        _uiState.value = _uiState.value.copy(showContactSelector = true, selectedCategory = category)
+    }
+    
+    fun dismissContactSelector() {
+        _uiState.value = _uiState.value.copy(showContactSelector = false, selectedCategory = null)
+    }
+    
+    // ... existing methods ...
+
+    suspend fun addEmergencyContacts(context: Context, contacts: List<EmergencyContact>, category: String = "other") {
+        val prefs = AppPreferences(context)
+        val currentContacts = prefs.getEmergencyContacts().toMutableList()
+        var hasChanges = false
+        
+        contacts.forEach { contact ->
+            if (currentContacts.none { it.id == contact.id || it.phoneNumber == contact.phoneNumber }) {
+                currentContacts.add(contact.copy(category = category))
+                hasChanges = true
+            }
+        }
+        
+        if (hasChanges) {
+            prefs.setEmergencyContacts(currentContacts)
+            loadData(context)
+        }
     }
     
     suspend fun renameApp(context: Context, app: AppInfo, newName: String) {

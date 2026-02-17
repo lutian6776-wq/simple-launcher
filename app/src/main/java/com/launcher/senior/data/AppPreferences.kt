@@ -268,6 +268,9 @@ class AppPreferences(private val context: Context? = null) {
                 put("phoneNumber", contact.phoneNumber)
                 put("contactId", contact.contactId ?: -1)
                 put("photoUri", contact.photoUri ?: "")
+                put("sortKey", contact.sortKey ?: "")
+                put("initialLetter", contact.initialLetter ?: "")
+                put("category", contact.category)
             }
             jsonArray.put(jsonObject)
         }
@@ -287,7 +290,10 @@ class AppPreferences(private val context: Context? = null) {
                     name = jsonObject.getString("name"),
                     phoneNumber = jsonObject.getString("phoneNumber"),
                     contactId = if (contactId >= 0) contactId else null,
-                    photoUri = jsonObject.optString("photoUri").takeIf { it.isNotEmpty() }
+                    photoUri = jsonObject.optString("photoUri").takeIf { it.isNotEmpty() },
+                    sortKey = jsonObject.optString("sortKey").takeIf { it.isNotEmpty() },
+                    initialLetter = jsonObject.optString("initialLetter").takeIf { it.isNotEmpty() },
+                    category = jsonObject.optString("category", "other")
                 )
             )
         }

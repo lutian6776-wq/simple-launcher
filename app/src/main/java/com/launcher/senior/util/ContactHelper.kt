@@ -20,11 +20,13 @@ object ContactHelper {
                 ContactsContract.Contacts._ID,
                 ContactsContract.Contacts.DISPLAY_NAME,
                 ContactsContract.Contacts.PHOTO_URI,
-                ContactsContract.Contacts.HAS_PHONE_NUMBER
+                ContactsContract.Contacts.HAS_PHONE_NUMBER,
+                ContactsContract.Contacts.SORT_KEY_PRIMARY,
+                "phonebook_label"
             ),
             null,
             null,
-            ContactsContract.Contacts.DISPLAY_NAME + " ASC"
+            ContactsContract.Contacts.SORT_KEY_PRIMARY + " ASC"
         )
         
         cursor?.use {
@@ -32,12 +34,26 @@ object ContactHelper {
             val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
             val photoUriIndex = it.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
             val hasPhoneIndex = it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)
+            val sortKeyIndex = it.getColumnIndex(ContactsContract.Contacts.SORT_KEY_PRIMARY)
+            val labelIndex = it.getColumnIndex("phonebook_label")
             
             while (it.moveToNext()) {
                 val contactId = it.getLong(idIndex)
                 val name = it.getString(nameIndex) ?: "未知"
                 val photoUri = it.getString(photoUriIndex)
                 val hasPhone = it.getInt(hasPhoneIndex) > 0
+                val sortKey = it.getString(sortKeyIndex) ?: name
+                var label = it.getString(labelIndex)
+                
+                if (label.isNullOrEmpty()) {
+                    // 如果没有 phonebook_label，尝试从 sort_key 获取首字母
+                    label = if (sortKey.isNotEmpty()) {
+                        val firstChar = sortKey.first().uppercaseChar()
+                        if (firstChar in 'A'..'Z') firstChar.toString() else "#"
+                    } else {
+                        "#"
+                    }
+                }
                 
                 if (hasPhone) {
                     // 获取电话号码
@@ -60,7 +76,9 @@ object ContactHelper {
                                         name = name,
                                         phoneNumber = phoneNumber.replace(" ", "").replace("-", ""),
                                         contactId = contactId,
-                                        photoUri = photoUri
+                                        photoUri = photoUri,
+                                        sortKey = sortKey,
+                                        initialLetter = label
                                     )
                                 )
                             }
@@ -84,7 +102,9 @@ object ContactHelper {
             arrayOf(
                 ContactsContract.Contacts._ID,
                 ContactsContract.Contacts.DISPLAY_NAME,
-                ContactsContract.Contacts.PHOTO_URI
+                ContactsContract.Contacts.PHOTO_URI,
+                ContactsContract.Contacts.SORT_KEY_PRIMARY,
+                "phonebook_label"
             ),
             null,
             null,
@@ -95,8 +115,22 @@ object ContactHelper {
             if (it.moveToFirst()) {
                 val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
                 val photoUriIndex = it.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
+                val sortKeyIndex = it.getColumnIndex(ContactsContract.Contacts.SORT_KEY_PRIMARY)
+                val labelIndex = it.getColumnIndex("phonebook_label")
+                
                 val name = it.getString(nameIndex) ?: "未知"
                 val photoUri = it.getString(photoUriIndex)
+                val sortKey = it.getString(sortKeyIndex) ?: name
+                var label = it.getString(labelIndex)
+                
+                if (label.isNullOrEmpty()) {
+                    label = if (sortKey.isNotEmpty()) {
+                        val firstChar = sortKey.first().uppercaseChar()
+                        if (firstChar in 'A'..'Z') firstChar.toString() else "#"
+                    } else {
+                        "#"
+                    }
+                }
                 
                 // 获取电话号码
                 val phoneCursor: Cursor? = context.contentResolver.query(
@@ -118,7 +152,9 @@ object ContactHelper {
                             name = name,
                             phoneNumber = phoneNumber.replace(" ", "").replace("-", ""),
                             contactId = contactId,
-                            photoUri = photoUri
+                            photoUri = photoUri,
+                            sortKey = sortKey,
+                            initialLetter = label
                         )
                     }
                 }

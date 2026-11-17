@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">老人桌面</string>
     <string name="call">一键呼叫</string>
+    <string name="one_click_call">一键呼叫</string>
     <string name="wechat">微信</string>
     <string name="douyin">抖音</string>
     <string name="camera">相机</string>
@@ -25,5 +26,5 @@
     <string name="file_shortcuts">文件快捷方式</string>
     <string name="add_file">添加文件</string>
     <string name="no_files">还没有添加文件快捷方式</string>
-    <string name="click_to_add_file">点击右上角按钮添加文件</string>
+    <string name="click_to_add_file">点击添加文件</string>
 </resources>

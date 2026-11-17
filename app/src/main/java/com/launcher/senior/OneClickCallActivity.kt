@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -25,9 +26,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,24 +39,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.launcher.senior.data.EmergencyContact
 import com.launcher.senior.ui.theme.SeniorLauncherTheme
 import com.launcher.senior.util.ScaleHelper
-import com.launcher.senior.viewmodel.EmergencyCallViewModel
+import com.launcher.senior.viewmodel.OneClickCallViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.InputStream
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
-class EmergencyCallActivity : ComponentActivity() {
+class OneClickCallActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -61,10 +63,10 @@ class EmergencyCallActivity : ComponentActivity() {
             // 权限授予后刷新数据
         }
     }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // 检查并请求权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(
@@ -75,10 +77,10 @@ class EmergencyCallActivity : ComponentActivity() {
                 requestPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
             }
         }
-        
+
         setContent {
             SeniorLauncherTheme {
-                EmergencyCallScreen(
+                OneClickCallScreen(
                     onBack = { finish() }
                 )
             }
@@ -88,21 +90,45 @@ class EmergencyCallActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun EmergencyCallScreen(
+fun OneClickCallScreen(
     onBack: () -> Unit,
-    viewModel: EmergencyCallViewModel = viewModel()
+    viewModel: OneClickCallViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     val scale = ScaleHelper.getScale()
+    var pendingContactCategory by remember { mutableStateOf<String?>(null) }
+
+    val contactPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        val category = pendingContactCategory
+        pendingContactCategory = null
+        if (isGranted && category != null) {
+            viewModel.showContactSelector(category)
+        }
+    }
+
+    fun requestAddContact(category: String) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_CONTACTS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.showContactSelector(category)
+        } else {
+            pendingContactCategory = category
+            contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadContacts(context)
     }
 
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { 2 })
-    
+
     Scaffold(
         topBar = {
             Column {
@@ -118,7 +144,7 @@ fun EmergencyCallScreen(
                         }
                     }
                 )
-                
+
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -138,12 +164,12 @@ fun EmergencyCallScreen(
                                 pagerState.animateScrollToPage(0)
                             }
                         },
-                        text = { 
+                        text = {
                             Text(
-                                "家人", 
+                                "家人",
                                 fontSize = ScaleHelper.scaledSp(18, scale),
                                 fontWeight = if (pagerState.currentPage == 0) FontWeight.Bold else FontWeight.Normal
-                            ) 
+                            )
                         }
                     )
                     Tab(
@@ -153,12 +179,12 @@ fun EmergencyCallScreen(
                                 pagerState.animateScrollToPage(1)
                             }
                         },
-                        text = { 
+                        text = {
                             Text(
-                                "其他", 
+                                "其他",
                                 fontSize = ScaleHelper.scaledSp(18, scale),
                                 fontWeight = if (pagerState.currentPage == 1) FontWeight.Bold else FontWeight.Normal
-                            ) 
+                            )
                         }
                     )
                 }
@@ -179,7 +205,8 @@ fun EmergencyCallScreen(
                         scope.launch {
                             viewModel.initiateCall(contact)
                         }
-                    }
+                    },
+                    onAddContact = { requestAddContact("family") }
                 )
                 1 -> OtherPage(
                     contacts = uiState.otherContacts,
@@ -188,12 +215,29 @@ fun EmergencyCallScreen(
                         scope.launch {
                             viewModel.initiateCall(contact)
                         }
-                    }
+                    },
+                    onAddContact = { requestAddContact("other") }
                 )
             }
         }
     }
-    
+
+    // 联系人选择对话框
+    if (uiState.showContactSelector) {
+        ContactSelectorDialog(
+            onContactsSelected = { selected ->
+                scope.launch {
+                    val category = uiState.selectedCategory ?: "other"
+                    viewModel.addEmergencyContacts(context, selected, category)
+                    viewModel.dismissContactSelector()
+                }
+            },
+            onDismiss = {
+                viewModel.dismissContactSelector()
+            }
+        )
+    }
+
     // 显示长按确认对话框
     uiState.callConfirmation?.let { contact ->
         CallConfirmationDialog(
@@ -211,33 +255,74 @@ fun EmergencyCallScreen(
 }
 
 @Composable
-fun FamilyPage(
-    contacts: List<EmergencyContact>,
+private fun EmptyContactsState(
+    icon: ImageVector,
+    message: String,
     scale: Float,
-    onCall: (EmergencyContact) -> Unit
+    onAddContact: () -> Unit
 ) {
-    if (contacts.isEmpty()) {
-         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(ScaleHelper.scaledDp(32, scale)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
+            Icon(
+                icon,
+                contentDescription = null,
+                modifier = Modifier.size(ScaleHelper.scaledDp(64, scale)),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                message,
+                fontSize = ScaleHelper.scaledSp(20, scale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(
+                onClick = onAddContact,
+                modifier = Modifier
+                    .padding(top = ScaleHelper.scaledDp(8, scale))
+                    .heightIn(min = ScaleHelper.scaledDp(56, scale)),
+                contentPadding = PaddingValues(
+                    horizontal = ScaleHelper.scaledDp(28, scale),
+                    vertical = ScaleHelper.scaledDp(14, scale)
+                ),
+                shape = RoundedCornerShape(ScaleHelper.scaledDp(16, scale))
             ) {
                 Icon(
-                    Icons.Default.People,
+                    Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(ScaleHelper.scaledDp(64, scale)),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.size(ScaleHelper.scaledDp(28, scale))
                 )
+                Spacer(modifier = Modifier.width(ScaleHelper.scaledDp(8, scale)))
                 Text(
-                    "暂无家人",
-                    fontSize = ScaleHelper.scaledSp(20, scale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "点击添加联系人",
+                    fontSize = ScaleHelper.scaledSp(22, scale),
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
+    }
+}
+
+@Composable
+fun FamilyPage(
+    contacts: List<EmergencyContact>,
+    scale: Float,
+    onCall: (EmergencyContact) -> Unit,
+    onAddContact: () -> Unit
+) {
+    if (contacts.isEmpty()) {
+        EmptyContactsState(
+            icon = Icons.Default.People,
+            message = "暂无家人",
+            scale = scale,
+            onAddContact = onAddContact
+        )
     } else {
         androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
             columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
@@ -263,35 +348,21 @@ fun FamilyPage(
 fun OtherPage(
     contacts: List<EmergencyContact>,
     scale: Float,
-    onCall: (EmergencyContact) -> Unit
+    onCall: (EmergencyContact) -> Unit,
+    onAddContact: () -> Unit
 ) {
     if (contacts.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(16, scale))
-            ) {
-                Icon(
-                    Icons.Default.Contacts,
-                    contentDescription = null,
-                    modifier = Modifier.size(ScaleHelper.scaledDp(64, scale)),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "暂无其他联系人",
-                    fontSize = ScaleHelper.scaledSp(20, scale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        EmptyContactsState(
+            icon = Icons.Default.Contacts,
+            message = "暂无其他联系人",
+            scale = scale,
+            onAddContact = onAddContact
+        )
     } else {
         val groupedContacts = remember(contacts) {
             contacts.groupBy { it.initialLetter ?: "#" }.toSortedMap()
         }
-        
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(0.dp)
@@ -302,7 +373,10 @@ fun OtherPage(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = ScaleHelper.scaledDp(16, scale), vertical = ScaleHelper.scaledDp(8, scale))
+                            .padding(
+                                horizontal = ScaleHelper.scaledDp(16, scale),
+                                vertical = ScaleHelper.scaledDp(8, scale)
+                            )
                     ) {
                         Text(
                             text = letter,
@@ -312,13 +386,15 @@ fun OtherPage(
                         )
                     }
                 }
-                
+
                 items(groupContacts) { contact ->
-                    Box(modifier = Modifier.padding(
-                        horizontal = ScaleHelper.scaledDp(8, scale),
-                        vertical = ScaleHelper.scaledDp(4, scale)
-                    )) {
-                        EmergencyCallListItem(
+                    Box(
+                        modifier = Modifier.padding(
+                            horizontal = ScaleHelper.scaledDp(8, scale),
+                            vertical = ScaleHelper.scaledDp(4, scale)
+                        )
+                    ) {
+                        OneClickCallListItem(
                             contact = contact,
                             scale = scale,
                             onCall = { onCall(contact) }
@@ -330,10 +406,9 @@ fun OtherPage(
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmergencyCallListItem(
+fun OneClickCallListItem(
     contact: EmergencyContact,
     scale: Float = 1f,
     onCall: () -> Unit
@@ -467,15 +542,17 @@ fun FamilyContactItem(
                     )
                 }
             }
-            
+
             // 底部文字背景
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
-                    ))
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                        )
+                    )
                     .padding(ScaleHelper.scaledDp(8, scale))
             ) {
                 Text(

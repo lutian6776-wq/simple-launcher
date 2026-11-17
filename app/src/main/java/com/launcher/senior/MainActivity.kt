@@ -9,7 +9,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,15 +31,23 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -48,7 +58,7 @@ import com.launcher.senior.util.SystemInfoHelper
 import com.launcher.senior.util.ScaleHelper
 import com.launcher.senior.viewmodel.MainViewModel
 import com.launcher.senior.viewmodel.MainUiState
-import com.launcher.senior.EmergencyCallActivity
+import com.launcher.senior.OneClickCallActivity
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -121,7 +131,11 @@ fun MainScreen(
     Scaffold(
         topBar = {
             CustomTopBar(
-                onLongPressTitle = onSettingsClick
+                onLongPressTitle = onSettingsClick,
+                showSettingsTip = uiState.showSettingsTip,
+                onDismissSettingsTip = { doNotShowAgain ->
+                    viewModel.dismissSettingsTip(context, doNotShowAgain)
+                }
             )
         }
     ) { paddingValues ->
@@ -134,8 +148,8 @@ fun MainScreen(
             uiState = uiState,
             scale = scale,
             topButtonHeight = topButtonHeight,
-            onEmergencyCallClick = {
-                context.startActivity(Intent(context, EmergencyCallActivity::class.java))
+            onOneClickCallClick = {
+                context.startActivity(Intent(context, OneClickCallActivity::class.java))
             },
             onFilesClick = {
                 context.startActivity(Intent(context, FilesActivity::class.java))
@@ -154,7 +168,7 @@ fun PortraitLayout(
     uiState: MainUiState,
     scale: Float,
     topButtonHeight: Dp,
-    onEmergencyCallClick: () -> Unit,
+    onOneClickCallClick: () -> Unit,
     onFilesClick: () -> Unit,
     onAppClick: (AppInfo) -> Unit,
     modifier: Modifier = Modifier
@@ -172,7 +186,7 @@ fun PortraitLayout(
             ) {
                 CallButton(
                     phoneNumber = uiState.emergencyPhoneNumber,
-                    onClick = onEmergencyCallClick,
+                    onClick = onOneClickCallClick,
                     modifier = Modifier
                         .weight(1f)
                         .height(topButtonHeight),
@@ -221,7 +235,7 @@ fun PortraitLayout(
 fun LandscapeLayout(
     uiState: MainUiState,
     scale: Float,
-    onEmergencyCallClick: () -> Unit,
+    onOneClickCallClick: () -> Unit,
     onFilesClick: () -> Unit,
     onAppClick: (AppInfo) -> Unit,
     modifier: Modifier = Modifier
@@ -241,7 +255,7 @@ fun LandscapeLayout(
         ) {
             CallButton(
                 phoneNumber = uiState.emergencyPhoneNumber,
-                onClick = onEmergencyCallClick,
+                onClick = onOneClickCallClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
@@ -703,10 +717,22 @@ fun QuickAppButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomTopBar(
-    onLongPressTitle: () -> Unit
+    onLongPressTitle: () -> Unit,
+    showSettingsTip: Boolean = false,
+    onDismissSettingsTip: (Boolean) -> Unit = {}
 ) {
     val systemInfo by SystemInfoHelper.systemInfo.collectAsState()
-    
+    val scale = ScaleHelper.getScale()
+    var dontShowAgain by remember { mutableStateOf(false) }
+    val currentShowTip by rememberUpdatedState(showSettingsTip)
+    val currentDontShowAgain by rememberUpdatedState(dontShowAgain)
+
+    LaunchedEffect(showSettingsTip) {
+        if (showSettingsTip) {
+            dontShowAgain = false
+        }
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier.fillMaxWidth()
@@ -720,18 +746,33 @@ fun CustomTopBar(
         ) {
             // 左侧占位（与右侧等宽，使标题居中；时间在系统状态栏已有）
             Box(modifier = Modifier.weight(1f))
-            Text(
-                text = "老人桌面",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = { onLongPressTitle() }
-                        )
-                    },
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "老人桌面",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    if (currentShowTip) {
+                                        onDismissSettingsTip(currentDontShowAgain)
+                                    }
+                                    onLongPressTitle()
+                                }
+                            )
+                        },
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                if (showSettingsTip) {
+                    SettingsTipPopup(
+                        scale = scale,
+                        dontShowAgain = dontShowAgain,
+                        onDontShowAgainChange = { dontShowAgain = it },
+                        onDismiss = { onDismissSettingsTip(dontShowAgain) }
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.End,
@@ -834,5 +875,124 @@ fun BatteryIcon(level: Int, isCharging: Boolean) {
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onPrimaryContainer
         )
+    }
+}
+
+@Composable
+fun SettingsTipPopup(
+    scale: Float,
+    dontShowAgain: Boolean,
+    onDontShowAgainChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val popupPositionProvider = remember {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize
+            ): IntOffset {
+                val anchorCenterX = anchorBounds.left + anchorBounds.width / 2
+                val x = (anchorCenterX - popupContentSize.width / 2)
+                    .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
+                val y = anchorBounds.bottom
+                return IntOffset(x, y)
+            }
+        }
+    }
+
+    val bubbleColor = MaterialTheme.colorScheme.surfaceVariant
+    val cornerDp = ScaleHelper.scaledDp(16, scale)
+    val arrowWidth = ScaleHelper.scaledDp(24, scale)
+    val arrowHeight = ScaleHelper.scaledDp(12, scale)
+
+    Popup(
+        popupPositionProvider = popupPositionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(
+            focusable = true,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = ScaleHelper.scaledDp(16, scale))
+        ) {
+            // 向上指向“老人桌面”的三角形箭头
+            Canvas(
+                modifier = Modifier.size(width = arrowWidth, height = arrowHeight)
+            ) {
+                val path = Path().apply {
+                    moveTo(size.width / 2f, 0f)
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(path = path, color = bubbleColor)
+            }
+
+            Surface(
+                shape = RoundedCornerShape(cornerDp),
+                color = bubbleColor,
+                shadowElevation = ScaleHelper.scaledDp(8, scale),
+                modifier = Modifier.widthIn(
+                    min = ScaleHelper.scaledDp(220, scale),
+                    max = ScaleHelper.scaledDp(280, scale)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(
+                        horizontal = ScaleHelper.scaledDp(20, scale),
+                        vertical = ScaleHelper.scaledDp(16, scale)
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(ScaleHelper.scaledDp(12, scale))
+                ) {
+                    Text(
+                        text = "长按此处启动桌面设置",
+                        fontSize = ScaleHelper.scaledSp(20, scale),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(ScaleHelper.scaledDp(8, scale)))
+                            .clickable { onDontShowAgainChange(!dontShowAgain) }
+                            .padding(vertical = ScaleHelper.scaledDp(4, scale)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = dontShowAgain,
+                            onCheckedChange = onDontShowAgainChange
+                        )
+                        Spacer(modifier = Modifier.width(ScaleHelper.scaledDp(4, scale)))
+                        Text(
+                            text = "下次不再弹出",
+                            fontSize = ScaleHelper.scaledSp(16, scale),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Button(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(ScaleHelper.scaledDp(12, scale))
+                        ) {
+                            Text(
+                                text = "知道了",
+                                fontSize = ScaleHelper.scaledSp(18, scale),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

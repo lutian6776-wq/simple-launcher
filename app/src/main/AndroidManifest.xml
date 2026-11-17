@@ -82,11 +82,11 @@
             android:label="@string/files"
             android:theme="@style/Theme.SeniorLauncher" />
         
-        <!-- 紧急呼叫Activity -->
+        <!-- 一键呼叫Activity -->
         <activity
-            android:name=".EmergencyCallActivity"
+            android:name=".OneClickCallActivity"
             android:exported="false"
-            android:label="紧急呼叫"
+            android:label="@string/one_click_call"
             android:theme="@style/Theme.SeniorLauncher" />
     </application>
 

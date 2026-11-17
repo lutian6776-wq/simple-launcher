@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -95,31 +97,22 @@ fun FilesScreen(
                             modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
                         )
                     }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        filePickerLauncher.launch(arrayOf("*/*"))
-                    }) {
-                        Icon(
-                            Icons.Default.Add,
-                            "添加文件",
-                            modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
-                        )
-                    }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    filePickerLauncher.launch(arrayOf("*/*"))
+            if (uiState.fileShortcuts.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = {
+                        filePickerLauncher.launch(arrayOf("*/*"))
+                    }
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        "添加文件",
+                        modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
+                    )
                 }
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    "添加文件",
-                    modifier = Modifier.size(ScaleHelper.scaledDp(24, scale))
-                )
             }
         }
     ) { paddingValues ->
@@ -147,11 +140,29 @@ fun FilesScreen(
                         fontSize = ScaleHelper.scaledSp(20, scale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        "点击右上角按钮添加文件",
-                        fontSize = ScaleHelper.scaledSp(16, scale),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Button(
+                        onClick = { filePickerLauncher.launch(arrayOf("*/*")) },
+                        modifier = Modifier
+                            .padding(top = ScaleHelper.scaledDp(8, scale))
+                            .heightIn(min = ScaleHelper.scaledDp(56, scale)),
+                        contentPadding = PaddingValues(
+                            horizontal = ScaleHelper.scaledDp(28, scale),
+                            vertical = ScaleHelper.scaledDp(14, scale)
+                        ),
+                        shape = RoundedCornerShape(ScaleHelper.scaledDp(16, scale))
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(ScaleHelper.scaledDp(28, scale))
+                        )
+                        Spacer(modifier = Modifier.width(ScaleHelper.scaledDp(8, scale)))
+                        Text(
+                            text = "点击添加文件",
+                            fontSize = ScaleHelper.scaledSp(22, scale),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         } else {

@@ -3,6 +3,7 @@ package com.launcher.senior.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,6 +26,7 @@ class AppPreferences(private val context: Context? = null) {
         private val CUSTOM_APPS_KEY = stringPreferencesKey("custom_apps")
         private val FILE_SHORTCUTS_KEY = stringPreferencesKey("file_shortcuts")
         private val DEFAULT_APP_MAPPINGS_KEY = stringPreferencesKey("default_app_mappings") // MIME类型 -> 应用包名
+        private val HIDE_SETTINGS_TIP_KEY = booleanPreferencesKey("hide_settings_tip")
     }
     
     private val dataStore: DataStore<Preferences> = 
@@ -109,6 +111,16 @@ class AppPreferences(private val context: Context? = null) {
     suspend fun setFileShortcuts(shortcuts: List<FileShortcut>) {
         dataStore.edit { preferences ->
             preferences[FILE_SHORTCUTS_KEY] = fileShortcutsToJson(shortcuts)
+        }
+    }
+
+    suspend fun shouldShowSettingsTip(): Boolean {
+        return !(dataStore.data.first()[HIDE_SETTINGS_TIP_KEY] ?: false)
+    }
+
+    suspend fun setHideSettingsTip(hide: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[HIDE_SETTINGS_TIP_KEY] = hide
         }
     }
     

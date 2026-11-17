@@ -21,12 +21,14 @@ import kotlinx.coroutines.launch
 data class MainUiState(
     val emergencyPhoneNumber: String = "",
     val quickApps: List<AppInfo> = emptyList(),
-    val customApps: List<AppInfo> = emptyList()
+    val customApps: List<AppInfo> = emptyList(),
+    val showSettingsTip: Boolean = false
 )
 
 class MainViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    private var hasCheckedSettingsTip = false
     
     fun loadData(context: Context) {
         viewModelScope.launch {
@@ -34,12 +36,28 @@ class MainViewModel : ViewModel() {
             val phoneNumber = appPreferences.getEmergencyPhoneNumber()
             val quickApps = appPreferences.getQuickApps()
             val customApps = appPreferences.getCustomApps()
+            val showTip = if (!hasCheckedSettingsTip) {
+                hasCheckedSettingsTip = true
+                appPreferences.shouldShowSettingsTip()
+            } else {
+                _uiState.value.showSettingsTip
+            }
             
             _uiState.value = MainUiState(
                 emergencyPhoneNumber = phoneNumber,
                 quickApps = quickApps,
-                customApps = customApps
+                customApps = customApps,
+                showSettingsTip = showTip
             )
+        }
+    }
+
+    fun dismissSettingsTip(context: Context, doNotShowAgain: Boolean) {
+        _uiState.value = _uiState.value.copy(showSettingsTip = false)
+        if (doNotShowAgain) {
+            viewModelScope.launch {
+                AppPreferences(context).setHideSettingsTip(true)
+            }
         }
     }
     
